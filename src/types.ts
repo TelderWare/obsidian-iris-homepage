@@ -1,4 +1,4 @@
-export const BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note", "new-note", "create-task", "command", "quick-switcher"] as const;
+export const BUILTIN_WIDGET_TYPES = ["recent-notes", "task-list", "embedded-note", "new-note", "create-task", "command", "quick-switcher"] as const;
 export type BuiltinWidgetType = (typeof BUILTIN_WIDGET_TYPES)[number];
 
 export interface WidgetConfig {

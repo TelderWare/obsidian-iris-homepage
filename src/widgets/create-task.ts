@@ -3,8 +3,7 @@ import * as chrono from "chrono-node";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
-
-const TASK_FOLDER = "Tasks by default";
+import { TASK_FOLDER, formatDate, getApiKey } from "../utils";
 
 export class CreateTaskWidget extends BaseWidget {
   private popover: HTMLElement | null = null;
@@ -40,8 +39,8 @@ export class CreateTaskWidget extends BaseWidget {
     const pop = this.containerEl.createDiv({ cls: "iris-hp-task-popover" });
     this.popover = pop;
 
-    const titleInput = this.addField(pop, "", "text", "Task name…");
-    const dueInput = this.addField(pop, "Due", "text", "tomorrow 3pm, next Friday…");
+    const titleInput = this.addField(pop, "", "Task name…");
+    const dueInput = this.addField(pop, "Due", "tomorrow 3pm, next Friday…");
 
     const btn = pop.createEl("button", { cls: "iris-hp-task-submit", text: "Create" });
     btn.addEventListener("click", (e) => {
@@ -50,7 +49,6 @@ export class CreateTaskWidget extends BaseWidget {
       this.submit(titleInput, dueInput);
     });
 
-    // Prevent clicks inside popover from dragging the widget
     pop.addEventListener("mousedown", (e) => e.stopPropagation());
     pop.addEventListener("click", (e) => e.stopPropagation());
 
@@ -58,10 +56,10 @@ export class CreateTaskWidget extends BaseWidget {
     titleInput.focus();
   }
 
-  private addField(parent: HTMLElement, label: string, type: string, placeholder: string): HTMLInputElement {
+  private addField(parent: HTMLElement, label: string, placeholder: string): HTMLInputElement {
     const row = parent.createDiv({ cls: "iris-hp-task-field" });
     if (label) row.createEl("label", { text: label });
-    const input = row.createEl("input", { type });
+    const input = row.createEl("input", { type: "text" });
     if (placeholder) input.placeholder = placeholder;
     return input;
   }
@@ -114,30 +112,25 @@ export class CreateTaskWidget extends BaseWidget {
   }
 
   private async parseDate(input: string): Promise<{ date: string; time: string | null } | null> {
-    // Try chrono-node first
     const results = chrono.parse(input);
     if (results.length > 0) {
       const start = results[0].start;
       const parsed = start.date();
-      const y = parsed.getFullYear();
-      const m = String(parsed.getMonth() + 1).padStart(2, "0");
-      const d = String(parsed.getDate()).padStart(2, "0");
       let time: string | null = null;
       if (start.isCertain("hour")) {
         const hh = String(parsed.getHours()).padStart(2, "0");
         const mm = String(parsed.getMinutes()).padStart(2, "0");
         time = `${hh}:${mm}`;
       }
-      return { date: `${y}-${m}-${d}`, time };
+      return { date: formatDate(parsed), time };
     }
 
     // Fallback to Claude API
-    const apiKey = (this.app as any).vault?.secretStorage?.getSecret?.("anthropic-api-key") ?? "";
+    const apiKey = getApiKey(this.app);
     if (!apiKey) return null;
 
     try {
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const todayStr = formatDate(new Date());
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {

@@ -260,14 +260,16 @@
   box-shadow: none;
 }
 
-/* ─── Recent notes widget ─── */
-.iris-hp-recent-list {
+/* ─── List widgets (recent notes, task list) ─── */
+.iris-hp-recent-list,
+.iris-hp-task-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.iris-hp-recent-item {
+.iris-hp-recent-item,
+.iris-hp-task-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -277,11 +279,13 @@
   transition: background 0.1s ease;
 }
 
-.iris-hp-recent-item:hover {
+.iris-hp-recent-item:hover,
+.iris-hp-task-item:hover {
   background: var(--background-modifier-hover);
 }
 
-.iris-hp-recent-name {
+.iris-hp-recent-name,
+.iris-hp-task-name {
   flex: 1;
   font-size: 0.9em;
   color: var(--text-normal);

@@ -1,6 +1,7 @@
 import { PluginSettingTab, App, Setting } from "obsidian";
 import type IrisHomepagePlugin from "./main";
 import { resolveWidgetLabel } from "./constants";
+import { getApiKey, setApiKey } from "./utils";
 
 export class IrisHomepageSettingsTab extends PluginSettingTab {
   private plugin: IrisHomepagePlugin;
@@ -66,12 +67,12 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       .setName("Anthropic API key")
       .setDesc("Used as a fallback for natural language date parsing when chrono-node can't interpret the input");
 
-    const existingKey = (this.app as any).vault?.secretStorage?.getSecret?.("anthropic-api-key") ?? null;
+    const existingKey = getApiKey(this.app);
 
     apiKeySetting.addText((text) => {
       text
         .setPlaceholder(existingKey ? "••••••••" : "sk-ant-…")
-        .onChange(() => {}); // no-op, saved on button click
+        .onChange(() => {});
       const inputEl = text.inputEl;
       inputEl.type = "password";
       inputEl.style.width = "220px";
@@ -80,7 +81,7 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
         btn.setButtonText("Save").onClick(async () => {
           const val = inputEl.value.trim();
           if (val) {
-            (this.app as any).vault.secretStorage.setSecret("anthropic-api-key", val);
+            setApiKey(this.app, val);
             inputEl.value = "";
             inputEl.placeholder = "••••••••";
           }
@@ -90,7 +91,7 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       if (existingKey) {
         apiKeySetting.addButton((btn) =>
           btn.setButtonText("Clear").setWarning().onClick(async () => {
-            (this.app as any).vault.secretStorage.setSecret("anthropic-api-key", "");
+            setApiKey(this.app, "");
             inputEl.placeholder = "sk-ant-…";
             inputEl.value = "";
           })

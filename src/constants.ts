@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: IrisHomepageSettings = {
 
 export const BUILTIN_WIDGETS: Record<BuiltinWidgetType, { label: string; icon: string; width: number; height: number }> = {
   "recent-notes": { label: "Recent Notes", icon: "clock", width: 4, height: 4 },
+  "task-list": { label: "Task List", icon: "list-checks", width: 4, height: 4 },
   "embedded-note": { label: "Embedded Note", icon: "file-text", width: 4, height: 6 },
   "new-note": { label: "New Note", icon: "plus", width: 2, height: 2 },
   "create-task": { label: "Create Task", icon: "check-square", width: 2, height: 2 },
