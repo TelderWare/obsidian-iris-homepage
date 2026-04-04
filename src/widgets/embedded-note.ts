@@ -40,7 +40,7 @@ export class EmbeddedNoteWidget extends BaseWidget {
       );
     }
 
-    this.init();
+    this.render();
   }
 
   render(): void {
@@ -86,11 +86,7 @@ export class EmbeddedNoteWidget extends BaseWidget {
       const files = this.app.vault.getMarkdownFiles();
       new NoteSuggestModal(this.app, files, (file) => {
         this.config.notePath = file.path;
-        const widgetConfig = this.plugin.settings.widgets.find((w) => w.id === this.config.id);
-        if (widgetConfig) {
-          widgetConfig.notePath = file.path;
-          this.plugin.saveSettings();
-        }
+        this.plugin.saveSettings();
       }).open();
     });
   }

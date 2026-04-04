@@ -15,7 +15,7 @@ export class RecentNotesWidget extends BaseWidget {
       this.debounceTimer = setTimeout(() => this.render(), 1000);
     });
 
-    this.init();
+    this.render();
   }
 
   render(): void {

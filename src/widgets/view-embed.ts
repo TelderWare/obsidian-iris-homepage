@@ -8,7 +8,7 @@ export class ViewEmbedWidget extends BaseWidget {
 
   constructor(app: App, containerEl: HTMLElement, config: WidgetConfig, plugin: IrisHomepagePlugin) {
     super(app, containerEl, config, plugin);
-    this.init();
+    this.render();
   }
 
   render(): void {

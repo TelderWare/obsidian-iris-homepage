@@ -30,19 +30,6 @@ export class GridEngine {
     return map;
   }
 
-  canPlace(
-    widgets: WidgetConfig[],
-    col: number,
-    row: number,
-    width: number,
-    height: number,
-    excludeId?: string
-  ): boolean {
-    if (col < 0 || row < 0 || col + width > this.columns) return false;
-    const map = this.buildOccupancyMap(widgets, excludeId);
-    return this.canPlaceWithMap(map, col, row, width, height);
-  }
-
   private canPlaceWithMap(
     map: Map<number, string>,
     col: number,

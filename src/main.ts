@@ -40,7 +40,10 @@ export default class IrisHomepagePlugin extends Plugin {
   }
 
   async onunload(): Promise<void> {
-    this.removeHideEmptyStyle();
+    if (this.hideEmptyStyleEl) {
+      this.hideEmptyStyleEl.remove();
+      this.hideEmptyStyleEl = null;
+    }
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_HOMEPAGE);
   }
 
@@ -75,22 +78,11 @@ export default class IrisHomepagePlugin extends Plugin {
   }
 
   private updateEmptyTabVisibility(): void {
-    if (this.settings.replaceNewTab) {
-      this.injectHideEmptyStyle();
-    } else {
-      this.removeHideEmptyStyle();
-    }
-  }
-
-  private injectHideEmptyStyle(): void {
-    if (this.hideEmptyStyleEl) return;
-    this.hideEmptyStyleEl = document.createElement("style");
-    this.hideEmptyStyleEl.textContent = `.workspace-leaf-content[data-type="empty"] { display: none !important; }`;
-    document.head.appendChild(this.hideEmptyStyleEl);
-  }
-
-  private removeHideEmptyStyle(): void {
-    if (this.hideEmptyStyleEl) {
+    if (this.settings.replaceNewTab && !this.hideEmptyStyleEl) {
+      this.hideEmptyStyleEl = document.createElement("style");
+      this.hideEmptyStyleEl.textContent = `.workspace-leaf-content[data-type="empty"] { display: none !important; }`;
+      document.head.appendChild(this.hideEmptyStyleEl);
+    } else if (!this.settings.replaceNewTab && this.hideEmptyStyleEl) {
       this.hideEmptyStyleEl.remove();
       this.hideEmptyStyleEl = null;
     }

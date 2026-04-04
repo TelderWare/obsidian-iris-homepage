@@ -42,10 +42,6 @@ export abstract class BaseWidget {
     return bodyEl;
   }
 
-  protected init(): void {
-    this.render();
-  }
-
   private onRemove(): void {
     const idx = this.plugin.settings.widgets.findIndex((w) => w.id === this.config.id);
     if (idx !== -1) {
