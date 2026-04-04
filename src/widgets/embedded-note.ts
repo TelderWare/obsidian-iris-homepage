@@ -1,4 +1,4 @@
-import { App, MarkdownRenderer, TFile, FuzzySuggestModal, setIcon } from "obsidian";
+import { App, MarkdownRenderer, TFile, FuzzySuggestModal, setIcon, EventRef } from "obsidian";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
@@ -27,17 +27,17 @@ class NoteSuggestModal extends FuzzySuggestModal<TFile> {
 }
 
 export class EmbeddedNoteWidget extends BaseWidget {
+  private modifyRef: EventRef | null = null;
+
   constructor(app: App, containerEl: HTMLElement, config: WidgetConfig, plugin: IrisHomepagePlugin) {
     super(app, containerEl, config, plugin);
 
     if (this.config.notePath) {
-      this.plugin.registerEvent(
-        this.app.vault.on("modify", (file) => {
-          if (file instanceof TFile && file.path === this.config.notePath) {
-            this.render();
-          }
-        })
-      );
+      this.modifyRef = this.app.vault.on("modify", (file) => {
+        if (file instanceof TFile && file.path === this.config.notePath) {
+          this.render();
+        }
+      });
     }
 
     this.render();
@@ -89,5 +89,13 @@ export class EmbeddedNoteWidget extends BaseWidget {
         this.plugin.saveSettings();
       }).open();
     });
+  }
+
+  destroy(): void {
+    if (this.modifyRef) {
+      this.app.vault.offref(this.modifyRef);
+      this.modifyRef = null;
+    }
+    super.destroy();
   }
 }

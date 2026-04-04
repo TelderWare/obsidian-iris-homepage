@@ -50,6 +50,29 @@ export default class IrisHomepagePlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const data = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+
+    // Migration: v2 halved ROW_HEIGHT, double heights/rows.
+    if (!this.settings.gridVersion || this.settings.gridVersion < 2) {
+      for (const w of this.settings.widgets) {
+        w.height *= 2;
+        w.row *= 2;
+      }
+      this.settings.gridVersion = 2;
+    }
+
+    // Migration: v3 doubled grid resolution horizontally, double columns/widths/cols.
+    if (this.settings.gridVersion < 3) {
+      this.settings.columns *= 2;
+      for (const w of this.settings.widgets) {
+        w.width *= 2;
+        w.col *= 2;
+      }
+      this.settings.gridVersion = 3;
+    }
+
+    if (!data?.gridVersion || data.gridVersion < 3) {
+      await this.saveData(this.settings);
+    }
   }
 
   async saveSettings(): Promise<void> {

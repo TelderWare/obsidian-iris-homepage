@@ -5,6 +5,7 @@ import { BaseWidget } from "./base-widget";
 
 export class ViewEmbedWidget extends BaseWidget {
   private embeddedView: View | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(app: App, containerEl: HTMLElement, config: WidgetConfig, plugin: IrisHomepagePlugin) {
     super(app, containerEl, config, plugin);
@@ -49,7 +50,6 @@ export class ViewEmbedWidget extends BaseWidget {
 
     if (!viewCreator) return false;
 
-    // Create a detached leaf that won't appear in the workspace tab bar.
     // WorkspaceLeaf constructor takes a single App argument internally.
     const leaf = new (WorkspaceLeaf as any)(this.app) as WorkspaceLeaf;
 
@@ -65,10 +65,39 @@ export class ViewEmbedWidget extends BaseWidget {
       await view.onOpen();
     }
 
+    this.resizeObserver = new ResizeObserver(() => {
+      this.triggerResize(view);
+    });
+    this.resizeObserver.observe(this.bodyEl);
+
     return true;
   }
 
+  private triggerResize(view: View): void {
+    const v = view as any;
+
+    if (typeof v.onResize === "function") {
+      v.onResize();
+    }
+
+    if (v.renderer) {
+      if (typeof v.renderer.onResize === "function") {
+        v.renderer.onResize();
+      }
+      if (typeof v.renderer.start === "function" && !v.renderer._running) {
+        v.renderer.start();
+      }
+      if (typeof v.renderer.render === "function") {
+        v.renderer.render();
+      }
+    }
+  }
+
   private cleanupView(): void {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
     if (this.embeddedView) {
       try {
         if (this.embeddedView.onClose) {

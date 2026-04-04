@@ -1,32 +1,32 @@
 import type { IrisHomepageSettings, BuiltinWidgetType } from "./types";
 
 export const VIEW_TYPE_HOMEPAGE = "iris-homepage-view";
-export const ROW_HEIGHT = 120;
+export const ROW_HEIGHT = 60;
 export const GRID_GAP = 12;
 
 export const DEFAULT_SETTINGS: IrisHomepageSettings = {
-  columns: 4,
+  columns: 8,
   widgets: [
     {
       id: "default-recent",
       type: "recent-notes",
       col: 0,
       row: 0,
-      width: 2,
-      height: 2,
-      maxItems: 10,
-      sortBy: "modified",
+      width: 4,
+      height: 4,
     },
   ],
   openOnStartup: true,
   replaceNewTab: true,
-  showGreeting: true,
-  greetingName: "",
+  borderless: false,
 };
 
 export const BUILTIN_WIDGETS: Record<BuiltinWidgetType, { label: string; icon: string; width: number; height: number }> = {
-  "recent-notes": { label: "Recent Notes", icon: "clock", width: 2, height: 2 },
-  "embedded-note": { label: "Embedded Note", icon: "file-text", width: 2, height: 3 },
+  "recent-notes": { label: "Recent Notes", icon: "clock", width: 4, height: 4 },
+  "embedded-note": { label: "Embedded Note", icon: "file-text", width: 4, height: 6 },
+  "new-note": { label: "New Note", icon: "plus", width: 2, height: 2 },
+  "command": { label: "Command", icon: "terminal", width: 2, height: 2 },
+  "quick-switcher": { label: "Quick Switcher", icon: "search", width: 8, height: 1 },
 };
 
 export const HIDDEN_VIEW_TYPES = new Set([

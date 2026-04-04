@@ -1,4 +1,4 @@
-export const BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note"] as const;
+export const BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note", "new-note", "command", "quick-switcher"] as const;
 export type BuiltinWidgetType = (typeof BUILTIN_WIDGET_TYPES)[number];
 
 export interface WidgetConfig {
@@ -8,11 +8,10 @@ export interface WidgetConfig {
   row: number;
   width: number;
   height: number;
-  // recent-notes
-  maxItems?: number;
-  sortBy?: "opened" | "modified";
   // embedded-note
   notePath?: string;
+  // command
+  commandId?: string;
   // view embeds
   viewState?: Record<string, unknown>;
 }
@@ -22,8 +21,8 @@ export interface IrisHomepageSettings {
   widgets: WidgetConfig[];
   openOnStartup: boolean;
   replaceNewTab: boolean;
-  showGreeting: boolean;
-  greetingName: string;
+  borderless: boolean;
+  gridVersion?: number;
 }
 
 export function isBuiltinWidget(type: string): type is BuiltinWidgetType {

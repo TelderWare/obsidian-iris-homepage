@@ -1,6 +1,6 @@
 import type { WidgetConfig } from "./types";
 
-const MAX_COLS = 16;
+const MAX_COLS = 32;
 
 function cellKey(row: number, col: number): number {
   return row * MAX_COLS + col;
@@ -62,11 +62,12 @@ export class GridEngine {
     }
   }
 
-  compact(widgets: WidgetConfig[]): void {
+  compact(widgets: WidgetConfig[], pinnedId?: string): void {
     const sorted = [...widgets].sort((a, b) => a.row - b.row || a.col - b.col);
     const map = this.buildOccupancyMap(widgets);
 
     for (const widget of sorted) {
+      if (widget.id === pinnedId) continue;
       this.removeFromMap(map, widget);
       let targetRow = 0;
       while (targetRow < widget.row) {
@@ -121,7 +122,7 @@ export class GridEngine {
       w.row = movedWidget.row + movedWidget.height;
     }
 
-    this.compact(widgets);
+    this.compact(widgets, movedWidget.id);
   }
 
   getMaxRow(widgets: WidgetConfig[]): number {

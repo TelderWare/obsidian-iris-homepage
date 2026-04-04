@@ -21,7 +21,7 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       .setDesc("Number of columns in the widget grid (2-16)")
       .addDropdown((drop) => {
         for (let i = 2; i <= 16; i++) {
-          drop.addOption(String(i), String(i));
+          drop.addOption(String(i * 2), String(i));
         }
         drop.setValue(String(this.plugin.settings.columns));
         drop.onChange(async (val) => {
@@ -51,30 +51,14 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Show greeting")
-      .setDesc("Display a time-based greeting at the top")
+      .setName("Borderless widgets")
+      .setDesc("Remove borders and backgrounds from widget cards")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.showGreeting).onChange(async (val) => {
-          this.plugin.settings.showGreeting = val;
+        toggle.setValue(this.plugin.settings.borderless).onChange(async (val) => {
+          this.plugin.settings.borderless = val;
           await this.plugin.saveSettings();
-          this.display();
         })
       );
-
-    if (this.plugin.settings.showGreeting) {
-      new Setting(containerEl)
-        .setName("Greeting name")
-        .setDesc("Name to use in the greeting (leave empty for no name)")
-        .addText((text) =>
-          text
-            .setPlaceholder("Your name")
-            .setValue(this.plugin.settings.greetingName)
-            .onChange(async (val) => {
-              this.plugin.settings.greetingName = val.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
 
     containerEl.createEl("h2", { text: "Widgets" });
 
@@ -96,32 +80,12 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
             })
         );
 
-      if (config.type === "recent-notes") {
+      if (config.type === "command" && config.commandId) {
+        const cmd = (this.app as any).commands?.commands?.[config.commandId];
         new Setting(containerEl)
           .setClass("iris-hp-setting-indent")
-          .setName("Max items")
-          .addText((text) =>
-            text.setValue(String(config.maxItems ?? 10)).onChange(async (val) => {
-              const num = parseInt(val, 10);
-              if (!isNaN(num) && num > 0) {
-                config.maxItems = num;
-                await this.plugin.saveSettings();
-              }
-            })
-          );
-
-        new Setting(containerEl)
-          .setClass("iris-hp-setting-indent")
-          .setName("Sort by")
-          .addDropdown((drop) => {
-            drop.addOption("modified", "Last modified");
-            drop.addOption("opened", "Last opened");
-            drop.setValue(config.sortBy ?? "modified");
-            drop.onChange(async (val) => {
-              config.sortBy = val as "modified" | "opened";
-              await this.plugin.saveSettings();
-            });
-          });
+          .setName("Command")
+          .setDesc(cmd?.name ?? config.commandId);
       }
 
       if (config.type === "embedded-note") {

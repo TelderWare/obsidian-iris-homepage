@@ -7,9 +7,15 @@ import { GridEngine } from "./grid-engine";
 import { BaseWidget } from "./widgets/base-widget";
 import { RecentNotesWidget } from "./widgets/recent-notes";
 import { EmbeddedNoteWidget } from "./widgets/embedded-note";
+import { NewNoteWidget } from "./widgets/new-note";
+import { CommandWidget } from "./widgets/command";
+import { QuickSwitcherWidget } from "./widgets/quick-switcher";
 import { ViewEmbedWidget } from "./widgets/view-embed";
 import { WidgetPickerModal } from "./widget-picker";
 import type { PickerResult } from "./widget-picker";
+
+const EMPTY_DRAG_IMG = new Image();
+EMPTY_DRAG_IMG.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 
 
 export class HomepageView extends ItemView {
@@ -57,10 +63,7 @@ export class HomepageView extends ItemView {
     root.empty();
     root.addClass("iris-hp-root");
     root.toggleClass("iris-hp-edit-mode", this.editMode);
-
-    if (this.plugin.settings.showGreeting) {
-      this.renderGreeting(root);
-    }
+    root.toggleClass("iris-hp-borderless", this.plugin.settings.borderless);
 
     const gridEl = root.createDiv({ cls: "iris-hp-grid" });
     this.gridEl = gridEl;
@@ -69,10 +72,21 @@ export class HomepageView extends ItemView {
     gridEl.style.gap = `${GRID_GAP}px`;
 
     const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
-    gridEl.style.minHeight = `${(maxRow + 2) * (ROW_HEIGHT + GRID_GAP)}px`;
 
     for (const config of this.plugin.settings.widgets) {
       this.renderWidget(gridEl, config);
+    }
+
+    if (this.editMode) {
+      const cols = this.plugin.settings.columns;
+      const rows = maxRow + 2;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });
+          dot.style.gridColumn = `${c + 1}`;
+          dot.style.gridRow = `${r + 1}`;
+        }
+      }
     }
 
     this.attachGridListeners(gridEl);
@@ -100,6 +114,63 @@ export class HomepageView extends ItemView {
       });
       setIcon(addBtn, "plus");
       addBtn.addEventListener("click", () => this.openPicker());
+
+      // Trash drop zone
+      const trash = root.createDiv({ cls: "iris-hp-trash-zone" });
+      setIcon(trash, "trash-2");
+
+      trash.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        trash.addClass("iris-hp-trash-hover");
+      });
+
+      trash.addEventListener("dragleave", () => {
+        trash.removeClass("iris-hp-trash-hover");
+      });
+
+      trash.addEventListener("drop", (e) => {
+        e.preventDefault();
+        trash.removeClass("iris-hp-trash-hover");
+        if (!this.draggedWidgetId || !this.gridEl) return;
+
+        const widgetId = this.draggedWidgetId;
+        const gridEl = this.gridEl;
+        this.draggedWidgetId = null;
+
+        const deleteWidget = () => {
+          const idx = this.plugin.settings.widgets.findIndex((w) => w.id === widgetId);
+          if (idx === -1) return;
+          const oldPositions = this.snapshotPositions(gridEl);
+          this.plugin.settings.widgets.splice(idx, 1);
+          this.engine.compact(this.plugin.settings.widgets);
+          this.animateReflow(gridEl, oldPositions);
+          this.plugin.saveData(this.plugin.settings);
+        };
+
+        const wrapper = gridEl.querySelector<HTMLElement>(
+          `.iris-hp-widget-wrapper[data-widget-id="${widgetId}"]`
+        );
+
+        if (wrapper) {
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const trashRect = trash.getBoundingClientRect();
+          const dx = trashRect.left + trashRect.width / 2 - (wrapperRect.left + wrapperRect.width / 2);
+          const dy = trashRect.top + trashRect.height / 2 - (wrapperRect.top + wrapperRect.height / 2);
+
+          wrapper.style.transition = "transform 0.25s ease, opacity 0.25s ease";
+          wrapper.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+          wrapper.style.opacity = "0";
+          wrapper.style.zIndex = "200";
+
+          let deleted = false;
+          const doDelete = () => { if (!deleted) { deleted = true; wrapper.remove(); deleteWidget(); } };
+          wrapper.addEventListener("transitionend", doDelete, { once: true });
+          setTimeout(doDelete, 350);
+        } else {
+          deleteWidget();
+        }
+      });
     }
   }
 
@@ -108,19 +179,6 @@ export class HomepageView extends ItemView {
     const result = await modal.open();
     if (!result) return;
     this.addWidget(result);
-  }
-
-  private renderGreeting(root: HTMLElement): void {
-    const hour = new Date().getHours();
-    let greeting: string;
-    if (hour < 12) greeting = "Good morning";
-    else if (hour < 18) greeting = "Good afternoon";
-    else greeting = "Good evening";
-
-    const name = this.plugin.settings.greetingName;
-    const text = name ? `${greeting}, ${name}` : greeting;
-
-    root.createEl("h1", { cls: "iris-hp-greeting", text });
   }
 
   private renderWidget(gridEl: HTMLElement, config: WidgetConfig): void {
@@ -138,6 +196,15 @@ export class HomepageView extends ItemView {
           break;
         case "embedded-note":
           widget = new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "new-note":
+          widget = new NewNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "command":
+          widget = new CommandWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "quick-switcher":
+          widget = new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
           break;
       }
     } else {
@@ -160,11 +227,6 @@ export class HomepageView extends ItemView {
       height,
     };
 
-    if (result.type === "recent-notes") {
-      config.maxItems = 10;
-      config.sortBy = "modified";
-    }
-
     this.plugin.settings.widgets.push(config);
     this.engine.compact(this.plugin.settings.widgets);
     this.plugin.saveSettings();
@@ -182,6 +244,7 @@ export class HomepageView extends ItemView {
       if (this.draggedWidgetId && e.dataTransfer) {
         e.dataTransfer.setData("text/plain", this.draggedWidgetId);
         e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setDragImage(EMPTY_DRAG_IMG, 0, 0);
         wrapper.addClass("iris-hp-dragging");
       }
     });
@@ -214,7 +277,7 @@ export class HomepageView extends ItemView {
       widget.row = cell.row;
       this.engine.clamp(widget);
       this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
-      this.engine.compact(this.plugin.settings.widgets);
+      this.engine.compact(this.plugin.settings.widgets, widget.id);
       this.draggedWidgetId = null;
 
       this.animateReflow(gridEl, oldPositions);
@@ -229,12 +292,12 @@ export class HomepageView extends ItemView {
 
     gridEl.addEventListener("widget-resize-start", ((e: CustomEvent) => {
       if (!this.editMode) return;
-      const { widgetId, event: mouseEvent } = e.detail;
-      this.startResize(gridEl, widgetId, mouseEvent);
+      const { widgetId, corner, event: mouseEvent } = e.detail;
+      this.startResize(gridEl, widgetId, corner, mouseEvent);
     }) as EventListener);
   }
 
-  private startResize(gridEl: HTMLElement, widgetId: string, startEvent: MouseEvent): void {
+  private startResize(gridEl: HTMLElement, widgetId: string, corner: string, startEvent: MouseEvent): void {
     const widget = this.plugin.settings.widgets.find((w) => w.id === widgetId);
     if (!widget) return;
 
@@ -243,25 +306,70 @@ export class HomepageView extends ItemView {
     const stepX = cellW + GRID_GAP;
     const stepY = cellH + GRID_GAP;
 
+    const origCol = widget.col;
+    const origRow = widget.row;
     const origWidth = widget.width;
     const origHeight = widget.height;
+
+    const anchorRight = origCol + origWidth;   // for tl, bl
+    const anchorBottom = origRow + origHeight;  // for tl, tr
 
     const ghost = gridEl.createDiv({ cls: "iris-hp-resize-ghost" });
     this.setGridPos(ghost, widget.col, widget.row, widget.width, widget.height);
 
-    const endCellFromEvent = (e: MouseEvent) => ({
+    const cellFromEvent = (e: MouseEvent) => ({
       col: Math.floor((e.clientX - gridRect.left) / stepX),
       row: Math.floor((e.clientY - gridRect.top) / stepY),
     });
 
+    const computeRect = (e: MouseEvent) => {
+      const end = cellFromEvent(e);
+      let col = origCol, row = origRow, w = origWidth, h = origHeight;
+
+      switch (corner) {
+        case "br":
+          w = Math.max(1, end.col - origCol + 1);
+          h = Math.max(1, end.row - origRow + 1);
+          break;
+        case "bl":
+          col = Math.max(0, Math.min(end.col, anchorRight - 1));
+          w = anchorRight - col;
+          h = Math.max(1, end.row - origRow + 1);
+          break;
+        case "tr":
+          w = Math.max(1, end.col - origCol + 1);
+          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
+          h = anchorBottom - row;
+          break;
+        case "tl":
+          col = Math.max(0, Math.min(end.col, anchorRight - 1));
+          w = anchorRight - col;
+          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
+          h = anchorBottom - row;
+          break;
+        case "r":
+          w = Math.max(1, end.col - origCol + 1);
+          break;
+        case "l":
+          col = Math.max(0, Math.min(end.col, anchorRight - 1));
+          w = anchorRight - col;
+          break;
+        case "b":
+          h = Math.max(1, end.row - origRow + 1);
+          break;
+        case "t":
+          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
+          h = anchorBottom - row;
+          break;
+      }
+
+      w = Math.min(w, this.plugin.settings.columns - col);
+      return { col, row, w, h };
+    };
+
     const onMouseMove = (e: MouseEvent) => {
-      const end = endCellFromEvent(e);
-
-      let newWidth = Math.max(1, end.col - widget.col + 1);
-      let newHeight = Math.max(1, end.row - widget.row + 1);
-      newWidth = Math.min(newWidth, this.plugin.settings.columns - widget.col);
-
-      this.setGridPos(ghost, widget.col, widget.row, newWidth, newHeight);
+      const r = computeRect(e);
+      this.setGridPos(ghost, r.col, r.row, r.w, r.h);
     };
 
     const onMouseUp = (e: MouseEvent) => {
@@ -269,15 +377,16 @@ export class HomepageView extends ItemView {
       document.removeEventListener("mouseup", onMouseUp);
       ghost.remove();
 
-      const end = endCellFromEvent(e);
+      const r = computeRect(e);
+      widget.col = r.col;
+      widget.row = r.row;
+      widget.width = r.w;
+      widget.height = r.h;
 
-      widget.width = Math.max(1, Math.min(end.col - widget.col + 1, this.plugin.settings.columns - widget.col));
-      widget.height = Math.max(1, end.row - widget.row + 1);
-
-      if (widget.width !== origWidth || widget.height !== origHeight) {
+      if (widget.width !== origWidth || widget.height !== origHeight || widget.col !== origCol || widget.row !== origRow) {
         const oldPositions = this.snapshotPositions(gridEl);
         this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
-        this.engine.compact(this.plugin.settings.widgets);
+        this.engine.compact(this.plugin.settings.widgets, widget.id);
         this.animateReflow(gridEl, oldPositions);
         this.plugin.saveData(this.plugin.settings);
       }
@@ -351,10 +460,6 @@ export class HomepageView extends ItemView {
 
       this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
     }
-
-    // Update grid min-height
-    const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
-    gridEl.style.minHeight = `${(maxRow + 2) * (ROW_HEIGHT + GRID_GAP)}px`;
 
     // Force layout so new positions are computed
     gridEl.offsetHeight; // eslint-disable-line @typescript-eslint/no-unused-expressions
