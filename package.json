@@ -10,5 +10,8 @@
     "esbuild": "^0.21.0",
     "obsidian": "^1.4.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "chrono-node": "^2.9.0"
   }
 }

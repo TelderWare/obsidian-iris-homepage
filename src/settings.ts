@@ -60,6 +60,44 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
         })
       );
 
+    containerEl.createEl("h2", { text: "AI" });
+
+    const apiKeySetting = new Setting(containerEl)
+      .setName("Anthropic API key")
+      .setDesc("Used as a fallback for natural language date parsing when chrono-node can't interpret the input");
+
+    const existingKey = (this.app as any).vault?.secretStorage?.getSecret?.("anthropic-api-key") ?? null;
+
+    apiKeySetting.addText((text) => {
+      text
+        .setPlaceholder(existingKey ? "••••••••" : "sk-ant-…")
+        .onChange(() => {}); // no-op, saved on button click
+      const inputEl = text.inputEl;
+      inputEl.type = "password";
+      inputEl.style.width = "220px";
+
+      apiKeySetting.addButton((btn) =>
+        btn.setButtonText("Save").onClick(async () => {
+          const val = inputEl.value.trim();
+          if (val) {
+            (this.app as any).vault.secretStorage.setSecret("anthropic-api-key", val);
+            inputEl.value = "";
+            inputEl.placeholder = "••••••••";
+          }
+        })
+      );
+
+      if (existingKey) {
+        apiKeySetting.addButton((btn) =>
+          btn.setButtonText("Clear").setWarning().onClick(async () => {
+            (this.app as any).vault.secretStorage.setSecret("anthropic-api-key", "");
+            inputEl.placeholder = "sk-ant-…";
+            inputEl.value = "";
+          })
+        );
+      }
+    });
+
     containerEl.createEl("h2", { text: "Widgets" });
 
     for (let i = 0; i < this.plugin.settings.widgets.length; i++) {

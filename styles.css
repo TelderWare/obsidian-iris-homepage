@@ -492,6 +492,7 @@
 
 /* ─── Action widgets (new-note, command) ─── */
 .iris-hp-new-note,
+.iris-hp-create-task,
 .iris-hp-command {
   display: flex;
   flex-direction: column;
@@ -506,11 +507,13 @@
 }
 
 .iris-hp-new-note:hover,
+.iris-hp-create-task:hover,
 .iris-hp-command:hover {
   color: var(--text-normal);
 }
 
 .iris-hp-new-note-icon,
+.iris-hp-create-task-icon,
 .iris-hp-command-icon {
   display: flex;
   align-items: center;
@@ -518,6 +521,7 @@
 }
 
 .iris-hp-new-note-icon svg,
+.iris-hp-create-task-icon svg,
 .iris-hp-command-icon svg {
   width: 24px;
   height: 24px;
@@ -525,6 +529,7 @@
 }
 
 .iris-hp-new-note-label,
+.iris-hp-create-task-label,
 .iris-hp-command-label {
   font-size: 0.8em;
   text-align: center;
@@ -536,12 +541,14 @@
 
 /* Hide labels when widget is too small */
 .iris-hp-new-note,
+.iris-hp-create-task,
 .iris-hp-command {
   container-type: size;
 }
 
 @container (max-height: 80px) {
   .iris-hp-new-note-label,
+  .iris-hp-create-task-label,
   .iris-hp-command-label {
     display: none;
   }
@@ -549,6 +556,7 @@
 
 @container (max-width: 80px) {
   .iris-hp-new-note-label,
+  .iris-hp-create-task-label,
   .iris-hp-command-label {
     display: none;
   }
@@ -556,6 +564,7 @@
 
 @container (max-height: 80px) {
   .iris-hp-new-note-icon svg,
+  .iris-hp-create-task-icon svg,
   .iris-hp-command-icon svg {
     width: 18px;
     height: 18px;
@@ -564,8 +573,82 @@
 
 /* Remove body padding on tiny action widgets so icon centers properly */
 .iris-hp-widget-body:has(.iris-hp-new-note),
+.iris-hp-widget-body:has(.iris-hp-create-task),
 .iris-hp-widget-body:has(.iris-hp-command) {
   padding: 0;
+}
+
+/* ─── Create task widget (popover) ─── */
+.iris-hp-widget-wrapper:has(.iris-hp-create-task) {
+  position: relative;
+}
+
+.iris-hp-widget-wrapper:has(.iris-hp-task-popover) {
+  overflow: visible !important;
+}
+
+.iris-hp-widget:has(.iris-hp-task-popover) {
+  overflow: visible;
+}
+
+.iris-hp-task-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  min-width: 240px;
+  margin-top: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.iris-hp-task-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.iris-hp-task-field label {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.iris-hp-task-field input {
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 4px 8px;
+  font-size: 0.85em;
+  color: var(--text-normal);
+  outline: none;
+}
+
+.iris-hp-task-field input:focus {
+  border-color: var(--interactive-accent);
+}
+
+.iris-hp-task-submit {
+  margin-top: 4px;
+  padding: 6px 12px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-s);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.iris-hp-task-submit:hover {
+  filter: brightness(1.1);
 }
 
 /* ─── Quick switcher widget ─── */

@@ -8,6 +8,7 @@ import { BaseWidget } from "./widgets/base-widget";
 import { RecentNotesWidget } from "./widgets/recent-notes";
 import { EmbeddedNoteWidget } from "./widgets/embedded-note";
 import { NewNoteWidget } from "./widgets/new-note";
+import { CreateTaskWidget } from "./widgets/create-task";
 import { CommandWidget } from "./widgets/command";
 import { QuickSwitcherWidget } from "./widgets/quick-switcher";
 import { ViewEmbedWidget } from "./widgets/view-embed";
@@ -199,6 +200,9 @@ export class HomepageView extends ItemView {
           break;
         case "new-note":
           widget = new NewNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "create-task":
+          widget = new CreateTaskWidget(this.app, wrapper, config, this.plugin);
           break;
         case "command":
           widget = new CommandWidget(this.app, wrapper, config, this.plugin);
