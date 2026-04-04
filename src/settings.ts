@@ -18,9 +18,9 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Grid columns")
-      .setDesc("Number of columns in the widget grid (3-6)")
+      .setDesc("Number of columns in the widget grid (2-16)")
       .addDropdown((drop) => {
-        for (let i = 3; i <= 6; i++) {
+        for (let i = 2; i <= 16; i++) {
           drop.addOption(String(i), String(i));
         }
         drop.setValue(String(this.plugin.settings.columns));
@@ -122,22 +122,6 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             });
           });
-      }
-
-      if (config.type === "quick-note") {
-        new Setting(containerEl)
-          .setClass("iris-hp-setting-indent")
-          .setName("Default folder")
-          .setDesc("Folder for new notes (leave empty for vault root)")
-          .addText((text) =>
-            text
-              .setPlaceholder("folder/path")
-              .setValue(config.templateFolder ?? "")
-              .onChange(async (val) => {
-                config.templateFolder = val.trim();
-                await this.plugin.saveSettings();
-              })
-          );
       }
 
       if (config.type === "embedded-note") {

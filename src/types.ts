@@ -1,4 +1,4 @@
-export const BUILTIN_WIDGET_TYPES = ["recent-notes", "quick-note", "embedded-note"] as const;
+export const BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note"] as const;
 export type BuiltinWidgetType = (typeof BUILTIN_WIDGET_TYPES)[number];
 
 export interface WidgetConfig {
@@ -11,8 +11,6 @@ export interface WidgetConfig {
   // recent-notes
   maxItems?: number;
   sortBy?: "opened" | "modified";
-  // quick-note
-  templateFolder?: string;
   // embedded-note
   notePath?: string;
   // view embeds

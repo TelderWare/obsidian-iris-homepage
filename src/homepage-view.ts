@@ -6,7 +6,6 @@ import { VIEW_TYPE_HOMEPAGE, ROW_HEIGHT, GRID_GAP } from "./constants";
 import { GridEngine } from "./grid-engine";
 import { BaseWidget } from "./widgets/base-widget";
 import { RecentNotesWidget } from "./widgets/recent-notes";
-import { QuickNoteWidget } from "./widgets/quick-note";
 import { EmbeddedNoteWidget } from "./widgets/embedded-note";
 import { ViewEmbedWidget } from "./widgets/view-embed";
 import { WidgetPickerModal } from "./widget-picker";
@@ -128,8 +127,7 @@ export class HomepageView extends ItemView {
     const wrapper = gridEl.createDiv({ cls: "iris-hp-widget-wrapper" });
     wrapper.dataset.widgetId = config.id;
     wrapper.setAttribute("draggable", "true");
-    wrapper.style.gridColumn = `${config.col + 1} / span ${config.width}`;
-    wrapper.style.gridRow = `${config.row + 1} / span ${config.height}`;
+    this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
 
     let widget: BaseWidget;
 
@@ -137,9 +135,6 @@ export class HomepageView extends ItemView {
       switch (config.type) {
         case "recent-notes":
           widget = new RecentNotesWidget(this.app, wrapper, config, this.plugin);
-          break;
-        case "quick-note":
-          widget = new QuickNoteWidget(this.app, wrapper, config, this.plugin);
           break;
         case "embedded-note":
           widget = new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
@@ -244,29 +239,29 @@ export class HomepageView extends ItemView {
     if (!widget) return;
 
     const gridRect = gridEl.getBoundingClientRect();
-    const cellWidth = (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns;
-    const cellHeight = ROW_HEIGHT;
+    const { cellW, cellH } = this.getCellSize(gridRect);
+    const stepX = cellW + GRID_GAP;
+    const stepY = cellH + GRID_GAP;
 
     const origWidth = widget.width;
     const origHeight = widget.height;
 
     const ghost = gridEl.createDiv({ cls: "iris-hp-resize-ghost" });
-    ghost.style.gridColumn = `${widget.col + 1} / span ${widget.width}`;
-    ghost.style.gridRow = `${widget.row + 1} / span ${widget.height}`;
+    this.setGridPos(ghost, widget.col, widget.row, widget.width, widget.height);
+
+    const endCellFromEvent = (e: MouseEvent) => ({
+      col: Math.floor((e.clientX - gridRect.left) / stepX),
+      row: Math.floor((e.clientY - gridRect.top) / stepY),
+    });
 
     const onMouseMove = (e: MouseEvent) => {
-      const relX = e.clientX - gridRect.left;
-      const relY = e.clientY - gridRect.top;
+      const end = endCellFromEvent(e);
 
-      const endCol = Math.floor(relX / (cellWidth + GRID_GAP));
-      const endRow = Math.floor(relY / (cellHeight + GRID_GAP));
-
-      let newWidth = Math.max(1, endCol - widget.col + 1);
-      let newHeight = Math.max(1, endRow - widget.row + 1);
+      let newWidth = Math.max(1, end.col - widget.col + 1);
+      let newHeight = Math.max(1, end.row - widget.row + 1);
       newWidth = Math.min(newWidth, this.plugin.settings.columns - widget.col);
 
-      ghost.style.gridColumn = `${widget.col + 1} / span ${newWidth}`;
-      ghost.style.gridRow = `${widget.row + 1} / span ${newHeight}`;
+      this.setGridPos(ghost, widget.col, widget.row, newWidth, newHeight);
     };
 
     const onMouseUp = (e: MouseEvent) => {
@@ -274,14 +269,10 @@ export class HomepageView extends ItemView {
       document.removeEventListener("mouseup", onMouseUp);
       ghost.remove();
 
-      const relX = e.clientX - gridRect.left;
-      const relY = e.clientY - gridRect.top;
+      const end = endCellFromEvent(e);
 
-      const endCol = Math.floor(relX / (cellWidth + GRID_GAP));
-      const endRow = Math.floor(relY / (cellHeight + GRID_GAP));
-
-      widget.width = Math.max(1, Math.min(endCol - widget.col + 1, this.plugin.settings.columns - widget.col));
-      widget.height = Math.max(1, endRow - widget.row + 1);
+      widget.width = Math.max(1, Math.min(end.col - widget.col + 1, this.plugin.settings.columns - widget.col));
+      widget.height = Math.max(1, end.row - widget.row + 1);
 
       if (widget.width !== origWidth || widget.height !== origHeight) {
         const oldPositions = this.snapshotPositions(gridEl);
@@ -308,8 +299,12 @@ export class HomepageView extends ItemView {
     }
 
     const col = Math.min(cell.col, this.plugin.settings.columns - widget.width);
-    this.ghostEl.style.gridColumn = `${col + 1} / span ${widget.width}`;
-    this.ghostEl.style.gridRow = `${cell.row + 1} / span ${widget.height}`;
+    this.setGridPos(this.ghostEl, col, cell.row, widget.width, widget.height);
+  }
+
+  private setGridPos(el: HTMLElement, col: number, row: number, w: number, h: number): void {
+    el.style.gridColumn = `${col + 1} / span ${w}`;
+    el.style.gridRow = `${row + 1} / span ${h}`;
   }
 
   private removeGhost(): void {
@@ -319,15 +314,21 @@ export class HomepageView extends ItemView {
     }
   }
 
+  private getCellSize(gridRect: DOMRect): { cellW: number; cellH: number } {
+    return {
+      cellW: (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns,
+      cellH: ROW_HEIGHT,
+    };
+  }
+
   private getCellFromEvent(gridEl: HTMLElement, e: MouseEvent): { col: number; row: number } | null {
     const gridRect = gridEl.getBoundingClientRect();
-    const cellWidth = (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns;
-    const cellHeight = ROW_HEIGHT;
+    const { cellW, cellH } = this.getCellSize(gridRect);
 
     const relX = e.clientX - gridRect.left;
     const relY = e.clientY - gridRect.top;
 
-    return this.engine.pixelToCell(relX, relY, cellWidth + GRID_GAP, cellHeight + GRID_GAP);
+    return this.engine.pixelToCell(relX, relY, cellW + GRID_GAP, cellH + GRID_GAP);
   }
 
   /** Snapshot bounding rects for all widget wrappers keyed by widget ID. */
@@ -348,8 +349,7 @@ export class HomepageView extends ItemView {
       );
       if (!wrapper) continue;
 
-      wrapper.style.gridColumn = `${config.col + 1} / span ${config.width}`;
-      wrapper.style.gridRow = `${config.row + 1} / span ${config.height}`;
+      this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
     }
 
     // Update grid min-height

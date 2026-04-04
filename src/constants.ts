@@ -17,14 +17,6 @@ export const DEFAULT_SETTINGS: IrisHomepageSettings = {
       maxItems: 10,
       sortBy: "modified",
     },
-    {
-      id: "default-quicknote",
-      type: "quick-note",
-      col: 2,
-      row: 0,
-      width: 2,
-      height: 1,
-    },
   ],
   openOnStartup: true,
   replaceNewTab: true,
@@ -34,7 +26,6 @@ export const DEFAULT_SETTINGS: IrisHomepageSettings = {
 
 export const BUILTIN_WIDGETS: Record<BuiltinWidgetType, { label: string; icon: string; width: number; height: number }> = {
   "recent-notes": { label: "Recent Notes", icon: "clock", width: 2, height: 2 },
-  "quick-note": { label: "Quick Note", icon: "plus-square", width: 2, height: 1 },
   "embedded-note": { label: "Embedded Note", icon: "file-text", width: 2, height: 3 },
 };
 
