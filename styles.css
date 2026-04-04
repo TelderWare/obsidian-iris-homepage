@@ -1,0 +1,481 @@
+/* ─── Root ─── */
+.iris-hp-root {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* ─── Toolbar ─── */
+.iris-hp-toolbar {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 6px;
+  z-index: 100;
+}
+
+.iris-hp-toolbar-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.iris-hp-toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.iris-hp-toolbar-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* ─── Greeting ─── */
+.iris-hp-greeting {
+  font-size: 1.8em;
+  font-weight: 600;
+  margin: 0 0 20px 4px;
+  color: var(--text-normal);
+}
+
+/* ─── Grid ─── */
+.iris-hp-grid {
+  display: grid;
+  position: relative;
+}
+
+/* ─── Widget wrapper ─── */
+.iris-hp-widget-wrapper {
+  position: relative;
+}
+
+.iris-hp-widget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.iris-hp-widget:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.iris-hp-widget.iris-hp-dragging {
+  opacity: 0.35;
+}
+
+/* ─── Widget header ─── */
+.iris-hp-widget-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--background-secondary-alt);
+  border-bottom: 1px solid var(--background-modifier-border);
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.iris-hp-edit-mode .iris-hp-widget-header {
+  display: flex;
+  cursor: grab;
+}
+
+.iris-hp-edit-mode .iris-hp-widget-header:active {
+  cursor: grabbing;
+}
+
+.iris-hp-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.iris-hp-widget-icon {
+  display: flex;
+  align-items: center;
+}
+
+.iris-hp-widget-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── Remove button (overlay) ─── */
+.iris-hp-widget-remove {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.9);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.iris-hp-widget-remove svg {
+  width: 14px;
+  height: 14px;
+  color: white;
+}
+
+.iris-hp-widget-remove:hover {
+  background: rgba(185, 28, 28, 1);
+}
+
+.iris-hp-edit-mode .iris-hp-widget-remove {
+  display: flex;
+}
+
+/* ─── Widget body ─── */
+.iris-hp-widget-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.iris-hp-empty {
+  color: var(--text-faint);
+  font-size: 0.9em;
+  text-align: center;
+  padding: 16px;
+}
+
+/* ─── Resize handle ─── */
+.iris-hp-resize-handle {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+
+.iris-hp-resize-handle::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  border-radius: 0 0 2px 0;
+  opacity: 0.6;
+}
+
+.iris-hp-edit-mode .iris-hp-resize-handle {
+  display: block;
+}
+
+/* ─── Drag & resize ghosts ─── */
+.iris-hp-drop-ghost,
+.iris-hp-resize-ghost {
+  background: var(--interactive-accent);
+  opacity: 0.15;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ─── Edit mode indicators ─── */
+.iris-hp-edit-mode .iris-hp-widget {
+  border-style: dashed;
+  border-color: var(--interactive-accent);
+}
+
+/* ─── Recent notes widget ─── */
+.iris-hp-recent-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.iris-hp-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.iris-hp-recent-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.iris-hp-recent-name {
+  flex: 1;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iris-hp-recent-folder {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iris-hp-recent-time {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ─── Quick note widget ─── */
+.iris-hp-quick-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.iris-hp-quick-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.9em;
+}
+
+.iris-hp-quick-input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.iris-hp-quick-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+}
+
+.iris-hp-quick-btn:hover {
+  opacity: 0.9;
+}
+
+/* ─── Embedded note widget ─── */
+.iris-hp-embedded-content {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.iris-hp-embedded-content p {
+  margin: 0.5em 0;
+}
+
+.iris-hp-embedded-open {
+  position: absolute;
+  top: 8px;
+  right: 36px;
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+}
+
+.iris-hp-embedded-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+}
+
+.iris-hp-embedded-choose {
+  padding: 6px 16px;
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  border: none;
+  font-size: 0.85em;
+}
+
+/* ─── View embed widget ─── */
+.iris-hp-view-embed-body {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.iris-hp-view-embed-loading {
+  color: var(--text-faint);
+  font-size: 0.9em;
+  text-align: center;
+  padding: 24px;
+}
+
+.iris-hp-embedded-leaf {
+  height: 100%;
+  position: relative;
+}
+
+.iris-hp-embedded-leaf > .workspace-leaf-content {
+  height: 100%;
+}
+
+/* Hide all view chrome inside embedded views */
+.iris-hp-embedded-leaf .workspace-tab-header-container,
+.iris-hp-embedded-leaf .view-header,
+.iris-hp-embedded-leaf .view-header-nav-buttons,
+.iris-hp-embedded-leaf .view-header-title-container,
+.iris-hp-embedded-leaf .view-actions {
+  display: none !important;
+}
+
+/* ─── Widget picker modal ─── */
+.iris-hp-picker-modal {
+  max-width: 600px;
+  width: 90vw;
+}
+
+.iris-hp-picker-modal .modal-content {
+  padding: 0 20px 20px;
+}
+
+.iris-hp-picker-title {
+  font-size: 1.3em;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--text-normal);
+}
+
+.iris-hp-picker-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.95em;
+  margin-bottom: 16px;
+}
+
+.iris-hp-picker-search:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.iris-hp-picker-grid {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.iris-hp-picker-group-label {
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 16px 0 8px 0;
+  padding: 0;
+}
+
+.iris-hp-picker-group-label:first-child {
+  margin-top: 0;
+}
+
+.iris-hp-picker-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.iris-hp-picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.iris-hp-picker-card:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.iris-hp-picker-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iris-hp-picker-card-icon svg {
+  width: 22px;
+  height: 22px;
+  color: var(--text-muted);
+}
+
+.iris-hp-picker-card:hover .iris-hp-picker-card-icon svg {
+  color: var(--interactive-accent);
+}
+
+.iris-hp-picker-card-label {
+  font-size: 0.8em;
+  color: var(--text-normal);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.iris-hp-picker-empty {
+  color: var(--text-faint);
+  text-align: center;
+  padding: 24px;
+  font-size: 0.9em;
+}
+
+/* ─── Settings indent ─── */
+.iris-hp-setting-indent {
+  padding-left: 24px;
+}

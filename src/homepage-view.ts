@@ -1,0 +1,325 @@
+import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
+import type IrisHomepagePlugin from "./main";
+import type { WidgetConfig } from "./types";
+import { isBuiltinWidget } from "./types";
+import { VIEW_TYPE_HOMEPAGE, ROW_HEIGHT, GRID_GAP } from "./constants";
+import { GridEngine } from "./grid-engine";
+import { BaseWidget } from "./widgets/base-widget";
+import { RecentNotesWidget } from "./widgets/recent-notes";
+import { QuickNoteWidget } from "./widgets/quick-note";
+import { EmbeddedNoteWidget } from "./widgets/embedded-note";
+import { ViewEmbedWidget } from "./widgets/view-embed";
+import { WidgetPickerModal } from "./widget-picker";
+import type { PickerResult } from "./widget-picker";
+
+
+export class HomepageView extends ItemView {
+  private plugin: IrisHomepagePlugin;
+  private engine: GridEngine;
+  private widgetInstances: Map<string, BaseWidget> = new Map();
+  private editMode = false;
+  private draggedWidgetId: string | null = null;
+  private gridEl: HTMLElement | null = null;
+  private ghostEl: HTMLElement | null = null;
+
+  constructor(leaf: WorkspaceLeaf, plugin: IrisHomepagePlugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.engine = new GridEngine(plugin.settings.columns);
+  }
+
+  getViewType(): string {
+    return VIEW_TYPE_HOMEPAGE;
+  }
+
+  getDisplayText(): string {
+    return "Homepage";
+  }
+
+  getIcon(): string {
+    return "home";
+  }
+
+  async onOpen(): Promise<void> {
+    this.render();
+  }
+
+  async onClose(): Promise<void> {
+    this.widgetInstances.forEach((w) => w.destroy());
+    this.widgetInstances.clear();
+  }
+
+  render(): void {
+    this.engine.setColumns(this.plugin.settings.columns);
+    this.widgetInstances.forEach((w) => w.destroy());
+    this.widgetInstances.clear();
+
+    const root = this.contentEl;
+    root.empty();
+    root.addClass("iris-hp-root");
+    root.toggleClass("iris-hp-edit-mode", this.editMode);
+
+    if (this.plugin.settings.showGreeting) {
+      this.renderGreeting(root);
+    }
+
+    const gridEl = root.createDiv({ cls: "iris-hp-grid" });
+    this.gridEl = gridEl;
+    gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
+    gridEl.style.gridAutoRows = `${ROW_HEIGHT}px`;
+    gridEl.style.gap = `${GRID_GAP}px`;
+
+    const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
+    gridEl.style.minHeight = `${(maxRow + 2) * (ROW_HEIGHT + GRID_GAP)}px`;
+
+    for (const config of this.plugin.settings.widgets) {
+      this.renderWidget(gridEl, config);
+    }
+
+    this.attachGridListeners(gridEl);
+
+    this.renderToolbar(root);
+  }
+
+  private renderToolbar(root: HTMLElement): void {
+    const toolbar = root.createDiv({ cls: "iris-hp-toolbar" });
+
+    const editBtn = toolbar.createEl("button", {
+      cls: "iris-hp-toolbar-btn clickable-icon",
+      attr: { "aria-label": this.editMode ? "Done editing" : "Edit layout" },
+    });
+    setIcon(editBtn, this.editMode ? "check" : "pencil");
+    editBtn.addEventListener("click", () => {
+      this.editMode = !this.editMode;
+      this.render();
+    });
+
+    if (this.editMode) {
+      const addBtn = toolbar.createEl("button", {
+        cls: "iris-hp-toolbar-btn clickable-icon",
+        attr: { "aria-label": "Add widget" },
+      });
+      setIcon(addBtn, "plus");
+      addBtn.addEventListener("click", () => this.openPicker());
+    }
+  }
+
+  private async openPicker(): Promise<void> {
+    const modal = new WidgetPickerModal(this.app);
+    const result = await modal.open();
+    if (!result) return;
+    this.addWidget(result);
+  }
+
+  private renderGreeting(root: HTMLElement): void {
+    const hour = new Date().getHours();
+    let greeting: string;
+    if (hour < 12) greeting = "Good morning";
+    else if (hour < 18) greeting = "Good afternoon";
+    else greeting = "Good evening";
+
+    const name = this.plugin.settings.greetingName;
+    const text = name ? `${greeting}, ${name}` : greeting;
+
+    root.createEl("h1", { cls: "iris-hp-greeting", text });
+  }
+
+  private renderWidget(gridEl: HTMLElement, config: WidgetConfig): void {
+    const wrapper = gridEl.createDiv({ cls: "iris-hp-widget-wrapper" });
+    wrapper.dataset.widgetId = config.id;
+    wrapper.style.gridColumn = `${config.col + 1} / span ${config.width}`;
+    wrapper.style.gridRow = `${config.row + 1} / span ${config.height}`;
+
+    let widget: BaseWidget;
+
+    if (isBuiltinWidget(config.type)) {
+      switch (config.type) {
+        case "recent-notes":
+          widget = new RecentNotesWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "quick-note":
+          widget = new QuickNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "embedded-note":
+          widget = new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+      }
+    } else {
+      widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
+    }
+
+    this.widgetInstances.set(config.id, widget);
+  }
+
+  private addWidget(result: PickerResult): void {
+    const { width, height } = result;
+    const pos = this.engine.findFirstAvailable(this.plugin.settings.widgets, width, height);
+
+    const config: WidgetConfig = {
+      id: crypto.randomUUID(),
+      type: result.type,
+      col: pos.col,
+      row: pos.row,
+      width,
+      height,
+    };
+
+    if (result.type === "recent-notes") {
+      config.maxItems = 10;
+      config.sortBy = "modified";
+    }
+
+    this.plugin.settings.widgets.push(config);
+    this.engine.compact(this.plugin.settings.widgets);
+    this.plugin.saveSettings();
+  }
+
+  private attachGridListeners(gridEl: HTMLElement): void {
+    gridEl.addEventListener("dragstart", (e) => {
+      if (!this.editMode) {
+        e.preventDefault();
+        return;
+      }
+      const wrapper = (e.target as HTMLElement).closest(".iris-hp-widget-wrapper") as HTMLElement | null;
+      if (!wrapper) return;
+      this.draggedWidgetId = wrapper.dataset.widgetId || null;
+      if (this.draggedWidgetId && e.dataTransfer) {
+        e.dataTransfer.setData("text/plain", this.draggedWidgetId);
+        e.dataTransfer.effectAllowed = "move";
+        wrapper.addClass("iris-hp-dragging");
+      }
+    });
+
+    gridEl.addEventListener("dragover", (e) => {
+      if (!this.editMode || !this.draggedWidgetId) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      this.updateGhost(gridEl, e);
+    });
+
+    gridEl.addEventListener("dragleave", () => {
+      this.removeGhost();
+    });
+
+    gridEl.addEventListener("drop", (e) => {
+      e.preventDefault();
+      this.removeGhost();
+      if (!this.draggedWidgetId) return;
+
+      const cell = this.getCellFromEvent(gridEl, e);
+      if (!cell) return;
+
+      const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
+      if (!widget) return;
+
+      widget.col = Math.min(cell.col, this.plugin.settings.columns - widget.width);
+      widget.row = cell.row;
+      this.engine.clamp(widget);
+      this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
+      this.engine.compact(this.plugin.settings.widgets);
+      this.draggedWidgetId = null;
+      this.plugin.saveSettings();
+    });
+
+    gridEl.addEventListener("dragend", () => {
+      this.draggedWidgetId = null;
+      this.removeGhost();
+      gridEl.querySelectorAll(".iris-hp-dragging").forEach((el) => el.removeClass("iris-hp-dragging"));
+    });
+
+    gridEl.addEventListener("widget-resize-start", ((e: CustomEvent) => {
+      if (!this.editMode) return;
+      const { widgetId, event: mouseEvent } = e.detail;
+      this.startResize(gridEl, widgetId, mouseEvent);
+    }) as EventListener);
+  }
+
+  private startResize(gridEl: HTMLElement, widgetId: string, startEvent: MouseEvent): void {
+    const widget = this.plugin.settings.widgets.find((w) => w.id === widgetId);
+    if (!widget) return;
+
+    const gridRect = gridEl.getBoundingClientRect();
+    const cellWidth = (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns;
+    const cellHeight = ROW_HEIGHT;
+
+    const origWidth = widget.width;
+    const origHeight = widget.height;
+
+    const ghost = gridEl.createDiv({ cls: "iris-hp-resize-ghost" });
+    ghost.style.gridColumn = `${widget.col + 1} / span ${widget.width}`;
+    ghost.style.gridRow = `${widget.row + 1} / span ${widget.height}`;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const relX = e.clientX - gridRect.left;
+      const relY = e.clientY - gridRect.top;
+
+      const endCol = Math.floor(relX / (cellWidth + GRID_GAP));
+      const endRow = Math.floor(relY / (cellHeight + GRID_GAP));
+
+      let newWidth = Math.max(1, endCol - widget.col + 1);
+      let newHeight = Math.max(1, endRow - widget.row + 1);
+      newWidth = Math.min(newWidth, this.plugin.settings.columns - widget.col);
+
+      ghost.style.gridColumn = `${widget.col + 1} / span ${newWidth}`;
+      ghost.style.gridRow = `${widget.row + 1} / span ${newHeight}`;
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      ghost.remove();
+
+      const relX = e.clientX - gridRect.left;
+      const relY = e.clientY - gridRect.top;
+
+      const endCol = Math.floor(relX / (cellWidth + GRID_GAP));
+      const endRow = Math.floor(relY / (cellHeight + GRID_GAP));
+
+      widget.width = Math.max(1, Math.min(endCol - widget.col + 1, this.plugin.settings.columns - widget.col));
+      widget.height = Math.max(1, endRow - widget.row + 1);
+
+      if (widget.width !== origWidth || widget.height !== origHeight) {
+        this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
+        this.engine.compact(this.plugin.settings.widgets);
+        this.plugin.saveSettings();
+      }
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }
+
+  private updateGhost(gridEl: HTMLElement, e: DragEvent): void {
+    const cell = this.getCellFromEvent(gridEl, e);
+    if (!cell) return;
+
+    const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
+    if (!widget) return;
+
+    if (!this.ghostEl) {
+      this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
+    }
+
+    const col = Math.min(cell.col, this.plugin.settings.columns - widget.width);
+    this.ghostEl.style.gridColumn = `${col + 1} / span ${widget.width}`;
+    this.ghostEl.style.gridRow = `${cell.row + 1} / span ${widget.height}`;
+  }
+
+  private removeGhost(): void {
+    if (this.ghostEl) {
+      this.ghostEl.remove();
+      this.ghostEl = null;
+    }
+  }
+
+  private getCellFromEvent(gridEl: HTMLElement, e: MouseEvent): { col: number; row: number } | null {
+    const gridRect = gridEl.getBoundingClientRect();
+    const cellWidth = (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns;
+    const cellHeight = ROW_HEIGHT;
+
+    const relX = e.clientX - gridRect.left;
+    const relY = e.clientY - gridRect.top;
+
+    return this.engine.pixelToCell(relX, relY, cellWidth + GRID_GAP, cellHeight + GRID_GAP);
+  }
+}

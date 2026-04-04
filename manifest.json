@@ -1,0 +1,9 @@
+{
+  "id": "iris-homepage",
+  "name": "Iris Homepage",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "A customizable smartphone-style homepage with draggable, resizable widgets on a snap-to-grid layout.",
+  "author": "mgodd",
+  "isDesktopOnly": false
+}

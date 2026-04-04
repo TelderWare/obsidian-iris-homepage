@@ -1,0 +1,14 @@
+{
+  "name": "iris-homepage",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0",
+    "obsidian": "^1.4.0",
+    "typescript": "^5.4.0"
+  }
+}
