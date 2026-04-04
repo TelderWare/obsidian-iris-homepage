@@ -127,6 +127,7 @@ export class HomepageView extends ItemView {
   private renderWidget(gridEl: HTMLElement, config: WidgetConfig): void {
     const wrapper = gridEl.createDiv({ cls: "iris-hp-widget-wrapper" });
     wrapper.dataset.widgetId = config.id;
+    wrapper.setAttribute("draggable", "true");
     wrapper.style.gridColumn = `${config.col + 1} / span ${config.width}`;
     wrapper.style.gridRow = `${config.row + 1} / span ${config.height}`;
 
@@ -212,13 +213,17 @@ export class HomepageView extends ItemView {
       const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
       if (!widget) return;
 
+      const oldPositions = this.snapshotPositions(gridEl);
+
       widget.col = Math.min(cell.col, this.plugin.settings.columns - widget.width);
       widget.row = cell.row;
       this.engine.clamp(widget);
       this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
       this.engine.compact(this.plugin.settings.widgets);
       this.draggedWidgetId = null;
-      this.plugin.saveSettings();
+
+      this.animateReflow(gridEl, oldPositions);
+      this.plugin.saveData(this.plugin.settings);
     });
 
     gridEl.addEventListener("dragend", () => {
@@ -279,9 +284,11 @@ export class HomepageView extends ItemView {
       widget.height = Math.max(1, endRow - widget.row + 1);
 
       if (widget.width !== origWidth || widget.height !== origHeight) {
+        const oldPositions = this.snapshotPositions(gridEl);
         this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
         this.engine.compact(this.plugin.settings.widgets);
-        this.plugin.saveSettings();
+        this.animateReflow(gridEl, oldPositions);
+        this.plugin.saveData(this.plugin.settings);
       }
     };
 
@@ -321,5 +328,56 @@ export class HomepageView extends ItemView {
     const relY = e.clientY - gridRect.top;
 
     return this.engine.pixelToCell(relX, relY, cellWidth + GRID_GAP, cellHeight + GRID_GAP);
+  }
+
+  /** Snapshot bounding rects for all widget wrappers keyed by widget ID. */
+  private snapshotPositions(gridEl: HTMLElement): Map<string, DOMRect> {
+    const positions = new Map<string, DOMRect>();
+    gridEl.querySelectorAll<HTMLElement>(".iris-hp-widget-wrapper").forEach((el) => {
+      const id = el.dataset.widgetId;
+      if (id) positions.set(id, el.getBoundingClientRect());
+    });
+    return positions;
+  }
+
+  /** Apply new grid placements and FLIP-animate from old positions. */
+  private animateReflow(gridEl: HTMLElement, oldPositions: Map<string, DOMRect>): void {
+    for (const config of this.plugin.settings.widgets) {
+      const wrapper = gridEl.querySelector<HTMLElement>(
+        `.iris-hp-widget-wrapper[data-widget-id="${config.id}"]`
+      );
+      if (!wrapper) continue;
+
+      wrapper.style.gridColumn = `${config.col + 1} / span ${config.width}`;
+      wrapper.style.gridRow = `${config.row + 1} / span ${config.height}`;
+    }
+
+    // Update grid min-height
+    const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
+    gridEl.style.minHeight = `${(maxRow + 2) * (ROW_HEIGHT + GRID_GAP)}px`;
+
+    // Force layout so new positions are computed
+    gridEl.offsetHeight; // eslint-disable-line @typescript-eslint/no-unused-expressions
+
+    gridEl.querySelectorAll<HTMLElement>(".iris-hp-widget-wrapper").forEach((el) => {
+      const id = el.dataset.widgetId;
+      if (!id) return;
+      const oldRect = oldPositions.get(id);
+      if (!oldRect) return;
+
+      const newRect = el.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left;
+      const dy = oldRect.top - newRect.top;
+
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.25s ease";
+        el.style.transform = "";
+      });
+    });
   }
 }

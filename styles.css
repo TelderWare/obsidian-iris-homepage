@@ -57,6 +57,7 @@
 /* ─── Widget wrapper ─── */
 .iris-hp-widget-wrapper {
   position: relative;
+  transition: transform 0.25s ease;
 }
 
 .iris-hp-widget {
@@ -74,28 +75,16 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.iris-hp-widget.iris-hp-dragging {
+.iris-hp-widget-wrapper.iris-hp-dragging {
   opacity: 0.35;
 }
 
-/* ─── Widget header ─── */
-.iris-hp-widget-header {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: var(--background-secondary-alt);
-  border-bottom: 1px solid var(--background-modifier-border);
-  cursor: default;
-  flex-shrink: 0;
-}
-
-.iris-hp-edit-mode .iris-hp-widget-header {
-  display: flex;
+/* ─── Edit-mode drag cursor ─── */
+.iris-hp-edit-mode .iris-hp-widget-wrapper {
   cursor: grab;
 }
 
-.iris-hp-edit-mode .iris-hp-widget-header:active {
+.iris-hp-edit-mode .iris-hp-widget-wrapper:active {
   cursor: grabbing;
 }
 
@@ -178,17 +167,32 @@
   cursor: nwse-resize;
 }
 
+.iris-hp-resize-handle::before,
 .iris-hp-resize-handle::after {
   content: "";
   position: absolute;
-  bottom: 3px;
-  right: 3px;
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid var(--text-faint);
-  border-bottom: 2px solid var(--text-faint);
-  border-radius: 0 0 2px 0;
-  opacity: 0.6;
+  border-radius: 50%;
+  background: var(--text-faint);
+  opacity: 0.5;
+}
+
+.iris-hp-resize-handle::before {
+  width: 3px;
+  height: 3px;
+  bottom: 9px;
+  right: 4px;
+  box-shadow:
+    -5px 0 0 0 var(--text-faint),
+    0 -5px 0 0 var(--text-faint);
+}
+
+.iris-hp-resize-handle::after {
+  width: 3px;
+  height: 3px;
+  bottom: 4px;
+  right: 4px;
+  box-shadow:
+    -5px 0 0 0 var(--text-faint);
 }
 
 .iris-hp-edit-mode .iris-hp-resize-handle {
@@ -311,13 +315,26 @@
   position: absolute;
   top: 8px;
   right: 36px;
-  font-size: 0.75em;
-  padding: 2px 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-s);
   background: var(--background-modifier-hover);
   color: var(--text-muted);
   cursor: pointer;
   border: none;
+}
+
+.iris-hp-embedded-open svg {
+  width: 14px;
+  height: 14px;
+}
+
+.iris-hp-embedded-open:hover {
+  color: var(--text-normal);
 }
 
 .iris-hp-embedded-picker {

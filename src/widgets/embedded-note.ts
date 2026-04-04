@@ -1,4 +1,4 @@
-import { App, MarkdownRenderer, TFile, FuzzySuggestModal } from "obsidian";
+import { App, MarkdownRenderer, TFile, FuzzySuggestModal, setIcon } from "obsidian";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
@@ -63,7 +63,7 @@ export class EmbeddedNoteWidget extends BaseWidget {
       cls: "iris-hp-embedded-open clickable-icon",
       attr: { "aria-label": "Open note" },
     });
-    openBtn.textContent = "Open";
+    setIcon(openBtn, "external-link");
     openBtn.addEventListener("click", () => {
       this.app.workspace.getLeaf(false).openFile(file);
     });

@@ -21,9 +21,6 @@ export abstract class BaseWidget {
     this.containerEl.empty();
     this.containerEl.addClass("iris-hp-widget");
 
-    const headerEl = this.containerEl.createDiv({ cls: "iris-hp-widget-header" });
-    headerEl.setAttribute("draggable", "true");
-
     const bodyEl = this.containerEl.createDiv({ cls: "iris-hp-widget-body" });
 
     const removeBtn = this.containerEl.createEl("button", { cls: "iris-hp-widget-remove clickable-icon" });
