@@ -68,7 +68,7 @@ export class WidgetPickerModal extends Modal {
     this.gridEl.empty();
 
     const groups: { label: string; entries: PickerEntry[] }[] = [
-      { label: "Homepage", entries: this.filteredEntries.filter((e) => e.group === "homepage") },
+      { label: "Home", entries: this.filteredEntries.filter((e) => e.group === "homepage") },
       { label: "Core", entries: this.filteredEntries.filter((e) => e.group === "core") },
       { label: "Plugins", entries: this.filteredEntries.filter((e) => e.group === "plugin") },
     ];

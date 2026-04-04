@@ -38,7 +38,7 @@ export class HomepageView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Homepage";
+    return "Home";
   }
 
   getIcon(): string {

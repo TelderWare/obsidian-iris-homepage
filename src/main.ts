@@ -16,7 +16,7 @@ export default class IrisHomepagePlugin extends Plugin {
 
     this.addCommand({
       id: "open-homepage",
-      name: "Open homepage",
+      name: "Open home",
       callback: () => this.activateView(),
     });
 
