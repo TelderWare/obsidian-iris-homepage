@@ -58,16 +58,16 @@
 }
 
 /* ─── Edit-mode grid dots ─── */
+.iris-hp-edit-mode .iris-hp-widget-body {
+  pointer-events: none;
+}
+
 .iris-hp-grid-dot {
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 15;
-}
-
-.iris-hp-edit-mode .iris-hp-widget-body {
-  pointer-events: none;
+  z-index: 0;
 }
 
 .iris-hp-grid-dot::after {

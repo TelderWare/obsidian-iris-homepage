@@ -26,6 +26,8 @@ export class HomepageView extends ItemView {
   private widgetInstances: Map<string, BaseWidget> = new Map();
   private editMode = false;
   private draggedWidgetId: string | null = null;
+  private dragOffsetCol = 0;
+  private dragOffsetRow = 0;
   private gridEl: HTMLElement | null = null;
   private ghostEl: HTMLElement | null = null;
 
@@ -73,15 +75,17 @@ export class HomepageView extends ItemView {
     gridEl.style.gridAutoRows = `${ROW_HEIGHT}px`;
     gridEl.style.gap = `${GRID_GAP}px`;
 
-    const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
-
     for (const config of this.plugin.settings.widgets) {
       this.renderWidget(gridEl, config);
     }
 
     if (this.editMode) {
       const cols = this.plugin.settings.columns;
-      const rows = maxRow + 2;
+      const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
+      const rootStyle = getComputedStyle(this.contentEl);
+      const rootPadding = parseFloat(rootStyle.paddingTop) + parseFloat(rootStyle.paddingBottom);
+      const viewportRows = Math.floor((this.contentEl.clientHeight - rootPadding) / (ROW_HEIGHT + GRID_GAP));
+      const rows = Math.max(maxRow + 2, viewportRows);
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });
@@ -250,6 +254,15 @@ export class HomepageView extends ItemView {
       if (!wrapper) return;
       this.draggedWidgetId = wrapper.dataset.widgetId || null;
       if (this.draggedWidgetId && e.dataTransfer) {
+        const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
+        const cell = this.getCellFromEvent(gridEl, e);
+        if (widget && cell) {
+          this.dragOffsetCol = cell.col - widget.col;
+          this.dragOffsetRow = cell.row - widget.row;
+        } else {
+          this.dragOffsetCol = 0;
+          this.dragOffsetRow = 0;
+        }
         e.dataTransfer.setData("text/plain", this.draggedWidgetId);
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setDragImage(EMPTY_DRAG_IMG, 0, 0);
@@ -281,8 +294,8 @@ export class HomepageView extends ItemView {
 
       const oldPositions = this.snapshotPositions(gridEl);
 
-      widget.col = Math.min(cell.col, this.plugin.settings.columns - widget.width);
-      widget.row = cell.row;
+      widget.col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
+      widget.row = Math.max(0, cell.row - this.dragOffsetRow);
       this.engine.clamp(widget);
       this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
       this.engine.compact(this.plugin.settings.widgets, widget.id);
@@ -415,8 +428,9 @@ export class HomepageView extends ItemView {
       this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
     }
 
-    const col = Math.min(cell.col, this.plugin.settings.columns - widget.width);
-    this.setGridPos(this.ghostEl, col, cell.row, widget.width, widget.height);
+    const col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
+    const row = Math.max(0, cell.row - this.dragOffsetRow);
+    this.setGridPos(this.ghostEl, col, row, widget.width, widget.height);
   }
 
   private setGridPos(el: HTMLElement, col: number, row: number, w: number, h: number): void {
