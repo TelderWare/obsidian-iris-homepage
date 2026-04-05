@@ -1,6 +1,4496 @@
-var Ye=Object.defineProperty;var ki=Object.getOwnPropertyDescriptor;var Wi=Object.getOwnPropertyNames;var _i=Object.prototype.hasOwnProperty;var $i=(r,t,e)=>t in r?Ye(r,t,{enumerable:!0,configurable:!0,writable:!0,value:e}):r[t]=e;var Fi=(r,t)=>{for(var e in t)Ye(r,e,{get:t[e],enumerable:!0})},Li=(r,t,e,i)=>{if(t&&typeof t=="object"||typeof t=="function")for(let n of Wi(t))!_i.call(r,n)&&n!==e&&Ye(r,n,{get:()=>t[n],enumerable:!(i=ki(t,n))||i.enumerable});return r};var Ui=r=>Li(Ye({},"__esModule",{value:!0}),r);var p=(r,t,e)=>$i(r,typeof t!="symbol"?t+"":t,e);var ts={};Fi(ts,{default:()=>ft});module.exports=Ui(ts);var Ii=require("obsidian");var I="iris-homepage-view";var ut={columns:8,widgets:[{id:"default-recent",type:"recent-notes",col:0,row:0,width:4,height:4}],openOnStartup:!0,replaceNewTab:!0,borderless:!1},de={"recent-notes":{label:"Recent Notes",icon:"clock",width:4,height:4},"embedded-note":{label:"Embedded Note",icon:"file-text",width:4,height:6},"new-note":{label:"New Note",icon:"plus",width:2,height:2},"create-task":{label:"Create Task",icon:"check-square",width:2,height:2},command:{label:"Command",icon:"terminal",width:2,height:2},"quick-switcher":{label:"Quick Switcher",icon:"search",width:8,height:1}},$t=new Set([I,"empty"]),Ft=new Set(["markdown","canvas","graph","localgraph","file-explorer","search","tag","backlink","outgoing-link","outline","bookmarks","all-properties","file-properties","audio","image","pdf","video","release-notes"]);var Lt={"file-explorer":"folder",search:"search",graph:"git-fork",localgraph:"git-fork",backlink:"links-coming-in","outgoing-link":"links-going-out",tag:"tag",outline:"list",bookmarks:"bookmark",canvas:"layout-dashboard",markdown:"file-text","all-properties":"list-tree","file-properties":"list-tree",audio:"headphones",image:"image",pdf:"file-text",video:"play-circle","release-notes":"info"};function yt(r){return r.replace(/[-_]/g," ").replace(/\b\w/g,t=>t.toUpperCase())}function Ut(r){return r in de?de[r].label:yt(r)}var Q=require("obsidian");var Hi=["recent-notes","embedded-note","new-note","create-task","command","quick-switcher"];function Ht(r){return Hi.includes(r)}function pe(r,t){return r*32+t}var Be=class{constructor(t){this.columns=t}setColumns(t){this.columns=t}buildOccupancyMap(t,e){let i=new Map;for(let n of t)if(n.id!==e)for(let s=n.row;s<n.row+n.height;s++)for(let o=n.col;o<n.col+n.width;o++)i.set(pe(s,o),n.id);return i}canPlaceWithMap(t,e,i,n,s){if(e<0||i<0||e+n>this.columns)return!1;for(let o=i;o<i+s;o++)for(let a=e;a<e+n;a++)if(t.has(pe(o,a)))return!1;return!0}removeFromMap(t,e){for(let i=e.row;i<e.row+e.height;i++)for(let n=e.col;n<e.col+e.width;n++)t.delete(pe(i,n))}addToMap(t,e){for(let i=e.row;i<e.row+e.height;i++)for(let n=e.col;n<e.col+e.width;n++)t.set(pe(i,n),e.id)}compact(t,e){let i=[...t].sort((s,o)=>s.row-o.row||s.col-o.col),n=this.buildOccupancyMap(t);for(let s of i){if(s.id===e)continue;this.removeFromMap(n,s);let o=0;for(;o<s.row;){if(this.canPlaceWithMap(n,s.col,o,s.width,s.height)){s.row=o;break}o++}this.addToMap(n,s)}}clamp(t){t.width=Math.min(t.width,this.columns),t.width=Math.max(t.width,1),t.height=Math.max(t.height,1),t.col+t.width>this.columns&&(t.col=this.columns-t.width),t.col<0&&(t.col=0),t.row<0&&(t.row=0)}findFirstAvailable(t,e,i){let n=this.buildOccupancyMap(t),s=this.getMaxRow(t)+2;for(let o=0;o<=s;o++)for(let a=0;a<=this.columns-e;a++)if(this.canPlaceWithMap(n,a,o,e,i))return{col:a,row:o};return{col:0,row:s+1}}resolveCollisions(t,e){let i=this.buildOccupancyMap(t,e.id),n=new Set;for(let s=e.row;s<e.row+e.height;s++)for(let o=e.col;o<e.col+e.width;o++){let a=i.get(pe(s,o));a&&n.add(a)}if(n.size!==0){for(let s of n){let o=t.find(a=>a.id===s);o&&(o.row=e.row+e.height)}this.compactSubset(t,n)}}compactSubset(t,e){let i=t.filter(s=>e.has(s.id)).sort((s,o)=>s.row-o.row||s.col-o.col),n=this.buildOccupancyMap(t);for(let s of i){this.removeFromMap(n,s);let o=0;for(;o<s.row;){if(this.canPlaceWithMap(n,s.col,o,s.width,s.height)){s.row=o;break}o++}this.addToMap(n,s)}}getMaxRow(t){let e=0;for(let i of t)e=Math.max(e,i.row+i.height-1);return e}pixelToCell(t,e,i,n){return{col:Math.max(0,Math.min(this.columns-1,Math.floor(t/i))),row:Math.max(0,Math.floor(e/n))}}};var Bt=require("obsidian");var x=class{constructor(t,e,i,n){this.app=t,this.containerEl=e,this.config=i,this.plugin=n,this.bodyEl=this.buildCard()}buildCard(){this.containerEl.empty(),this.containerEl.addClass("iris-hp-widget");let t=this.containerEl.createDiv({cls:"iris-hp-widget-body"});for(let e of["tl","tr","bl","br","t","r","b","l"])this.containerEl.createDiv({cls:`iris-hp-resize-handle iris-hp-resize-${e}`}).addEventListener("mousedown",n=>{n.preventDefault(),n.stopPropagation(),this.containerEl.dispatchEvent(new CustomEvent("widget-resize-start",{bubbles:!0,detail:{widgetId:this.config.id,corner:e,event:n}}))});return t}destroy(){this.containerEl.empty()}};var ee="Tasks",Yt="anthropic-api-key";function Tt(r){let t=r.getFullYear(),e=String(r.getMonth()+1).padStart(2,"0"),i=String(r.getDate()).padStart(2,"0");return`${t}-${e}-${i}`}function ze(r){var t,e,i,n;return(n=(i=(e=(t=r.vault)==null?void 0:t.secretStorage)==null?void 0:e.getSecret)==null?void 0:i.call(e,Yt))!=null?n:""}function wt(r,t){r.vault.secretStorage.setSecret(Yt,t)}function Ve(r){var i,n;let t=(n=(i=r.vault.config)==null?void 0:i.userIgnoreFilters)!=null?n:[];if(t.length===0)return()=>!1;let e=t.map(s=>{try{return new RegExp(s)}catch(o){return null}}).filter(Boolean);return s=>e.some(o=>o.test(s))}function Ge(r,t){var e,i,n;return(n=(i=(e=r.metadataCache.getFileCache(t))==null?void 0:e.frontmatter)==null?void 0:i.displayTitle)!=null?n:t.basename}var je=class extends x{constructor(e,i,n,s){super(e,i,n,s);this.debounceTimer=null;this.eventRef=null;this.resizeObserver=null;this.lastHeight=0;this.hiddenFilter=Ve(this.app),this.eventRef=this.app.vault.on("modify",()=>{this.debounceTimer&&clearTimeout(this.debounceTimer),this.debounceTimer=setTimeout(()=>this.render(),1e3)}),this.resizeObserver=new ResizeObserver(()=>{let o=this.bodyEl.clientHeight;Math.abs(o-this.lastHeight)<4||(this.lastHeight=o,this.render())}),this.resizeObserver.observe(this.bodyEl),this.render()}render(){this.bodyEl.empty();let e=this.getRecentFiles(),i=32,s=(this.bodyEl.clientHeight||200)-28,o=Math.max(1,Math.floor(s/i)),a=e.slice(0,o);if(a.length===0){this.bodyEl.createDiv({cls:"iris-hp-empty",text:"No recent notes"});return}this.bodyEl.createEl("h6",{cls:"iris-hp-widget-title",text:"Recent notes"});let l=this.bodyEl.createEl("ul",{cls:"iris-hp-recent-list"});for(let c of a){let d=l.createEl("li",{cls:"iris-hp-recent-item"});d.createSpan({cls:"iris-hp-recent-name",text:Ge(this.app,c)}),d.addEventListener("click",()=>{this.app.workspace.getLeaf(!1).openFile(c)})}}getRecentFiles(){var n,s,o;let e=(o=(s=(n=this.app.workspace).getLastOpenFiles)==null?void 0:s.call(n))!=null?o:[],i=[];for(let a of e){let l=this.app.vault.getAbstractFileByPath(a);l instanceof Bt.TFile&&l.extension==="md"&&!this.hiddenFilter(l.path)&&i.push(l)}return i}destroy(){this.resizeObserver&&(this.resizeObserver.disconnect(),this.resizeObserver=null),this.debounceTimer&&clearTimeout(this.debounceTimer),this.eventRef&&(this.app.vault.offref(this.eventRef),this.eventRef=null),super.destroy()}};var _=require("obsidian");var Et=class extends _.FuzzySuggestModal{constructor(t,e,i){super(t),this.files=e,this.onChoose=i}getItems(){return this.files}getItemText(t){return t.path}onChooseItem(t){this.onChoose(t)}},Ke=class extends x{constructor(e,i,n,s){super(e,i,n,s);this.modifyRef=null;this.config.notePath&&(this.modifyRef=this.app.vault.on("modify",o=>{o instanceof _.TFile&&o.path===this.config.notePath&&this.render()})),this.render()}render(){if(this.bodyEl.empty(),!this.config.notePath){this.renderPicker();return}let e=this.app.vault.getAbstractFileByPath(this.config.notePath);if(!(e instanceof _.TFile)){this.bodyEl.createDiv({cls:"iris-hp-empty",text:"Note not found"});return}let i=this.bodyEl.createDiv({cls:"iris-hp-embedded-content"}),n=this.bodyEl.createEl("button",{cls:"iris-hp-embedded-open clickable-icon",attr:{"aria-label":"Open note"}});(0,_.setIcon)(n,"external-link"),n.addEventListener("click",()=>{this.app.workspace.getLeaf(!1).openFile(e)}),this.app.vault.cachedRead(e).then(s=>{_.MarkdownRenderer.render(this.app,s,i,e.path,this.plugin)})}renderPicker(){let e=this.bodyEl.createDiv({cls:"iris-hp-embedded-picker"});e.createDiv({cls:"iris-hp-empty",text:"No note selected"}),e.createEl("button",{cls:"iris-hp-embedded-choose",text:"Choose note"}).addEventListener("click",()=>{let n=this.app.vault.getMarkdownFiles();new Et(this.app,n,s=>{this.config.notePath=s.path,this.plugin.saveSettings()}).open()})}destroy(){this.modifyRef&&(this.app.vault.offref(this.modifyRef),this.modifyRef=null),super.destroy()}};var Ze=require("obsidian");var qe=class extends x{constructor(t,e,i,n){super(t,e,i,n),this.render()}render(){this.bodyEl.empty();let t=this.bodyEl.createDiv({cls:"iris-hp-new-note"}),e=t.createDiv({cls:"iris-hp-new-note-icon"});(0,Ze.setIcon)(e,"plus"),t.createDiv({cls:"iris-hp-new-note-label",text:"New note"}),t.addEventListener("click",()=>this.createNote())}async createNote(){let t=this.nextUntitledName(),e=await this.app.vault.create(t,"");await this.app.workspace.getLeaf(!1).openFile(e)}nextUntitledName(){let t=new Set(this.app.vault.getFiles().filter(i=>i instanceof Ze.TFile).map(i=>i.path));if(!t.has("Untitled.md"))return"Untitled.md";let e=1;for(;t.has(`Untitled ${e}.md`);)e++;return`Untitled ${e}.md`}};var ae=require("obsidian");var h;(function(r){r[r.AM=0]="AM",r[r.PM=1]="PM"})(h||(h={}));var y;(function(r){r[r.SUNDAY=0]="SUNDAY",r[r.MONDAY=1]="MONDAY",r[r.TUESDAY=2]="TUESDAY",r[r.WEDNESDAY=3]="WEDNESDAY",r[r.THURSDAY=4]="THURSDAY",r[r.FRIDAY=5]="FRIDAY",r[r.SATURDAY=6]="SATURDAY"})(y||(y={}));var b;(function(r){r[r.JANUARY=1]="JANUARY",r[r.FEBRUARY=2]="FEBRUARY",r[r.MARCH=3]="MARCH",r[r.APRIL=4]="APRIL",r[r.MAY=5]="MAY",r[r.JUNE=6]="JUNE",r[r.JULY=7]="JULY",r[r.AUGUST=8]="AUGUST",r[r.SEPTEMBER=9]="SEPTEMBER",r[r.OCTOBER=10]="OCTOBER",r[r.NOVEMBER=11]="NOVEMBER",r[r.DECEMBER=12]="DECEMBER"})(b||(b={}));function M(r,t){r.assign("day",t.getDate()),r.assign("month",t.getMonth()+1),r.assign("year",t.getFullYear())}function Je(r,t){r.assign("hour",t.getHours()),r.assign("minute",t.getMinutes()),r.assign("second",t.getSeconds()),r.assign("millisecond",t.getMilliseconds()),r.assign("meridiem",t.getHours()<12?h.AM:h.PM)}function $(r,t){r.imply("day",t.getDate()),r.imply("month",t.getMonth()+1),r.imply("year",t.getFullYear())}function me(r,t){r.imply("hour",t.getHours()),r.imply("minute",t.getMinutes()),r.imply("second",t.getSeconds()),r.imply("millisecond",t.getMilliseconds()),r.imply("meridiem",t.getHours()<12?h.AM:h.PM)}var Bi={ACDT:630,ACST:570,ADT:-180,AEDT:660,AEST:600,AFT:270,AKDT:-480,AKST:-540,ALMT:360,AMST:-180,AMT:-240,ANAST:720,ANAT:720,AQTT:300,ART:-180,AST:-240,AWDT:540,AWST:480,AZOST:0,AZOT:-60,AZST:300,AZT:240,BNT:480,BOT:-240,BRST:-120,BRT:-180,BST:60,BTT:360,CAST:480,CAT:120,CCT:390,CDT:-300,CEST:120,CET:{timezoneOffsetDuringDst:2*60,timezoneOffsetNonDst:60,dstStart:r=>zt(r,b.MARCH,y.SUNDAY,2),dstEnd:r=>zt(r,b.OCTOBER,y.SUNDAY,3)},CHADT:825,CHAST:765,CKT:-600,CLST:-180,CLT:-240,COT:-300,CST:-360,CT:{timezoneOffsetDuringDst:-5*60,timezoneOffsetNonDst:-6*60,dstStart:r=>U(r,b.MARCH,y.SUNDAY,2,2),dstEnd:r=>U(r,b.NOVEMBER,y.SUNDAY,1,2)},CVT:-60,CXT:420,ChST:600,DAVT:420,EASST:-300,EAST:-360,EAT:180,ECT:-300,EDT:-240,EEST:180,EET:120,EGST:0,EGT:-60,EST:-300,ET:{timezoneOffsetDuringDst:-4*60,timezoneOffsetNonDst:-5*60,dstStart:r=>U(r,b.MARCH,y.SUNDAY,2,2),dstEnd:r=>U(r,b.NOVEMBER,y.SUNDAY,1,2)},FJST:780,FJT:720,FKST:-180,FKT:-240,FNT:-120,GALT:-360,GAMT:-540,GET:240,GFT:-180,GILT:720,GMT:0,GST:240,GYT:-240,HAA:-180,HAC:-300,HADT:-540,HAE:-240,HAP:-420,HAR:-360,HAST:-600,HAT:-90,HAY:-480,HKT:480,HLV:-210,HNA:-240,HNC:-360,HNE:-300,HNP:-480,HNR:-420,HNT:-150,HNY:-540,HOVT:420,ICT:420,IDT:180,IOT:360,IRDT:270,IRKST:540,IRKT:540,IRST:210,IST:330,JST:540,KGT:360,KRAST:480,KRAT:480,KST:540,KUYT:240,LHDT:660,LHST:630,LINT:840,MAGST:720,MAGT:720,MART:-510,MAWT:300,MDT:-360,MESZ:120,MEZ:60,MHT:720,MMT:390,MSD:240,MSK:180,MST:-420,MT:{timezoneOffsetDuringDst:-6*60,timezoneOffsetNonDst:-7*60,dstStart:r=>U(r,b.MARCH,y.SUNDAY,2,2),dstEnd:r=>U(r,b.NOVEMBER,y.SUNDAY,1,2)},MUT:240,MVT:300,MYT:480,NCT:660,NDT:-90,NFT:690,NOVST:420,NOVT:360,NPT:345,NST:-150,NUT:-660,NZDT:780,NZST:720,OMSST:420,OMST:420,PDT:-420,PET:-300,PETST:720,PETT:720,PGT:600,PHOT:780,PHT:480,PKT:300,PMDT:-120,PMST:-180,PONT:660,PST:-480,PT:{timezoneOffsetDuringDst:-7*60,timezoneOffsetNonDst:-8*60,dstStart:r=>U(r,b.MARCH,y.SUNDAY,2,2),dstEnd:r=>U(r,b.NOVEMBER,y.SUNDAY,1,2)},PWT:540,PYST:-180,PYT:-240,RET:240,SAMT:240,SAST:120,SBT:660,SCT:240,SGT:480,SRT:-180,SST:-660,TAHT:-600,TFT:300,TJT:300,TKT:780,TLT:540,TMT:300,TVT:720,ULAT:480,UTC:0,UYST:-120,UYT:-180,UZT:300,VET:-210,VLAST:660,VLAT:660,VUT:660,WAST:120,WAT:60,WEST:60,WESZ:60,WET:0,WEZ:0,WFT:720,WGST:-120,WGT:-180,WIB:420,WIT:540,WITA:480,WST:780,WT:0,YAKST:600,YAKT:600,YAPT:600,YEKST:360,YEKT:360};function U(r,t,e,i,n=0){let s=0,o=0;for(;o<i;)s++,new Date(r,t-1,s).getDay()===e&&o++;return new Date(r,t-1,s,n)}function zt(r,t,e,i=0){let n=e===0?7:e,s=new Date(r,t-1+1,1,12),o=s.getDay()===0?7:s.getDay(),a;return o===n?a=7:o<n?a=7+o-n:a=o-n,s.setDate(s.getDate()-a),new Date(r,t-1,s.getDate(),i)}function Xe(r,t,e={}){var n;if(r==null)return null;if(typeof r=="number")return r;let i=(n=e[r])!=null?n:Bi[r];return i==null?null:typeof i=="number"?i:t==null?null:t>i.dstStart(t.getFullYear())&&!(t>i.dstEnd(t.getFullYear()))?i.timezoneOffsetDuringDst:i.timezoneOffsetNonDst}var Vt={day:0,second:0,millisecond:0};function E(r,t){var i,n,s,o,a,l,c;let e=new Date(r);if(t.y&&(t.year=t.y,delete t.y),t.mo&&(t.month=t.mo,delete t.mo),t.M&&(t.month=t.M,delete t.M),t.w&&(t.week=t.w,delete t.w),t.d&&(t.day=t.d,delete t.d),t.h&&(t.hour=t.h,delete t.h),t.m&&(t.minute=t.m,delete t.m),t.s&&(t.second=t.s,delete t.s),t.ms&&(t.millisecond=t.ms,delete t.ms),"year"in t){let d=Math.floor(t.year);e.setFullYear(e.getFullYear()+d);let m=t.year-d;m>0&&(t.month=(i=t==null?void 0:t.month)!=null?i:0,t.month+=m*12)}if("quarter"in t){let d=Math.floor(t.quarter);e.setMonth(e.getMonth()+d*3)}if("month"in t){let d=Math.floor(t.month);e.setMonth(e.getMonth()+d);let m=t.month-d;m>0&&(t.week=(n=t==null?void 0:t.week)!=null?n:0,t.week+=m*4)}if("week"in t){let d=Math.floor(t.week);e.setDate(e.getDate()+d*7);let m=t.week-d;m>0&&(t.day=(s=t==null?void 0:t.day)!=null?s:0,t.day+=Math.round(m*7))}if("day"in t){let d=Math.floor(t.day);e.setDate(e.getDate()+d);let m=t.day-d;m>0&&(t.hour=(o=t==null?void 0:t.hour)!=null?o:0,t.hour+=Math.round(m*24))}if("hour"in t){let d=Math.floor(t.hour);e.setHours(e.getHours()+d);let m=t.hour-d;m>0&&(t.minute=(a=t==null?void 0:t.minute)!=null?a:0,t.minute+=Math.round(m*60))}if("minute"in t){let d=Math.floor(t.minute);e.setMinutes(e.getMinutes()+d);let m=t.minute-d;m>0&&(t.second=(l=t==null?void 0:t.second)!=null?l:0,t.second+=Math.round(m*60))}if("second"in t){let d=Math.floor(t.second);e.setSeconds(e.getSeconds()+d);let m=t.second-d;m>0&&(t.millisecond=(c=t==null?void 0:t.millisecond)!=null?c:0,t.millisecond+=Math.round(m*1e3))}if("millisecond"in t){let d=Math.floor(t.millisecond);e.setMilliseconds(e.getMilliseconds()+d)}return e}function H(r){let t={};for(let e in r)t[e]=-r[e];return t}var Y=class r{constructor(t,e){p(this,"instant");p(this,"timezoneOffset");this.instant=t!=null?t:new Date,this.timezoneOffset=e!=null?e:null}static fromDate(t){return new r(t)}static fromInput(t,e){var s;if(t instanceof Date)return r.fromDate(t);let i=(s=t==null?void 0:t.instant)!=null?s:new Date,n=Xe(t==null?void 0:t.timezone,i,e);return new r(i,n)}getDateWithAdjustedTimezone(){let t=new Date(this.instant);return this.timezoneOffset!==null&&t.setMinutes(t.getMinutes()-this.getSystemTimezoneAdjustmentMinute(this.instant)),t}getSystemTimezoneAdjustmentMinute(t,e){var s;(!t||t.getTime()<0)&&(t=new Date);let i=-t.getTimezoneOffset(),n=(s=e!=null?e:this.timezoneOffset)!=null?s:i;return i-n}getTimezoneOffset(){var t;return(t=this.timezoneOffset)!=null?t:-this.instant.getTimezoneOffset()}},f=class r{constructor(t,e){p(this,"knownValues");p(this,"impliedValues");p(this,"reference");p(this,"_tags",new Set);if(this.reference=t,this.knownValues={},this.impliedValues={},e)for(let n in e)this.knownValues[n]=e[n];let i=t.getDateWithAdjustedTimezone();this.imply("day",i.getDate()),this.imply("month",i.getMonth()+1),this.imply("year",i.getFullYear()),this.imply("hour",12),this.imply("minute",0),this.imply("second",0),this.imply("millisecond",0)}static createRelativeFromReference(t,e=Vt){let i=E(t.getDateWithAdjustedTimezone(),e),n=new r(t);return n.addTag("result/relativeDate"),"hour"in e||"minute"in e||"second"in e||"millisecond"in e?(n.addTag("result/relativeDateAndTime"),Je(n,i),M(n,i),n.assign("timezoneOffset",t.getTimezoneOffset())):(me(n,i),n.imply("timezoneOffset",t.getTimezoneOffset()),"day"in e?(n.assign("day",i.getDate()),n.assign("month",i.getMonth()+1),n.assign("year",i.getFullYear()),n.assign("weekday",i.getDay())):"week"in e?(n.assign("day",i.getDate()),n.assign("month",i.getMonth()+1),n.assign("year",i.getFullYear()),n.imply("weekday",i.getDay())):(n.imply("day",i.getDate()),"month"in e?(n.assign("month",i.getMonth()+1),n.assign("year",i.getFullYear())):(n.imply("month",i.getMonth()+1),"year"in e?n.assign("year",i.getFullYear()):n.imply("year",i.getFullYear())))),n}get(t){return t in this.knownValues?this.knownValues[t]:t in this.impliedValues?this.impliedValues[t]:null}isCertain(t){return t in this.knownValues}getCertainComponents(){return Object.keys(this.knownValues)}imply(t,e){return t in this.knownValues?this:(this.impliedValues[t]=e,this)}assign(t,e){return this.knownValues[t]=e,delete this.impliedValues[t],this}addDurationAsImplied(t){let e=this.dateWithoutTimezoneAdjustment(),i=E(e,t);return("day"in t||"week"in t||"month"in t||"year"in t)&&(this.delete(["day","weekday","month","year"]),this.imply("day",i.getDate()),this.imply("weekday",i.getDay()),this.imply("month",i.getMonth()+1),this.imply("year",i.getFullYear())),("second"in t||"minute"in t||"hour"in t)&&(this.delete(["second","minute","hour"]),this.imply("second",i.getSeconds()),this.imply("minute",i.getMinutes()),this.imply("hour",i.getHours())),this}delete(t){typeof t=="string"&&(t=[t]);for(let e of t)delete this.knownValues[e],delete this.impliedValues[e]}clone(){let t=new r(this.reference);t.knownValues={},t.impliedValues={};for(let e in this.knownValues)t.knownValues[e]=this.knownValues[e];for(let e in this.impliedValues)t.impliedValues[e]=this.impliedValues[e];return t}isOnlyDate(){return!this.isCertain("hour")&&!this.isCertain("minute")&&!this.isCertain("second")}isOnlyTime(){return!this.isCertain("weekday")&&!this.isCertain("day")&&!this.isCertain("month")&&!this.isCertain("year")}isOnlyWeekdayComponent(){return this.isCertain("weekday")&&!this.isCertain("day")&&!this.isCertain("month")}isDateWithUnknownYear(){return this.isCertain("month")&&!this.isCertain("year")}isValidDate(){let t=this.dateWithoutTimezoneAdjustment();return!(t.getFullYear()!==this.get("year")||t.getMonth()!==this.get("month")-1||t.getDate()!==this.get("day")||this.get("hour")!=null&&t.getHours()!=this.get("hour")||this.get("minute")!=null&&t.getMinutes()!=this.get("minute"))}toString(){return`[ParsingComponents {
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/main.ts
+var main_exports = {};
+__export(main_exports, {
+  default: () => IrisHomepagePlugin
+});
+module.exports = __toCommonJS(main_exports);
+var import_obsidian11 = require("obsidian");
+
+// src/constants.ts
+var VIEW_TYPE_HOMEPAGE = "iris-homepage-view";
+var ROW_HEIGHT = 60;
+var GRID_GAP = 12;
+var DEFAULT_SETTINGS = {
+  columns: 8,
+  widgets: [
+    {
+      id: "default-recent",
+      type: "recent-notes",
+      col: 0,
+      row: 0,
+      width: 4,
+      height: 4
+    }
+  ],
+  openOnStartup: true,
+  replaceNewTab: true,
+  borderless: false
+};
+var BUILTIN_WIDGETS = {
+  "recent-notes": { label: "Recent Notes", icon: "clock", width: 4, height: 4 },
+  "embedded-note": { label: "Embedded Note", icon: "file-text", width: 4, height: 6 },
+  "new-note": { label: "New Note", icon: "plus", width: 2, height: 2 },
+  "create-task": { label: "Create Task", icon: "check-square", width: 2, height: 2 },
+  "command": { label: "Command", icon: "terminal", width: 2, height: 2 },
+  "quick-switcher": { label: "Quick Switcher", icon: "search", width: 8, height: 1 },
+  "iris-tasks-view": { label: "Tasks", icon: "list-checks", width: 4, height: 6 }
+};
+var HIDDEN_VIEW_TYPES = /* @__PURE__ */ new Set([
+  VIEW_TYPE_HOMEPAGE,
+  "empty"
+]);
+var CORE_VIEW_TYPES = /* @__PURE__ */ new Set([
+  "markdown",
+  "canvas",
+  "graph",
+  "localgraph",
+  "file-explorer",
+  "search",
+  "tag",
+  "backlink",
+  "outgoing-link",
+  "outline",
+  "bookmarks",
+  "all-properties",
+  "file-properties",
+  "audio",
+  "image",
+  "pdf",
+  "video",
+  "release-notes"
+]);
+var VIEW_TYPE_ICON_MAP = {
+  "file-explorer": "folder",
+  "search": "search",
+  "graph": "git-fork",
+  "localgraph": "git-fork",
+  "backlink": "links-coming-in",
+  "outgoing-link": "links-going-out",
+  "tag": "tag",
+  "outline": "list",
+  "bookmarks": "bookmark",
+  "canvas": "layout-dashboard",
+  "markdown": "file-text",
+  "all-properties": "list-tree",
+  "file-properties": "list-tree",
+  "audio": "headphones",
+  "image": "image",
+  "pdf": "file-text",
+  "video": "play-circle",
+  "release-notes": "info"
+};
+function humanizeViewType(type) {
+  return type.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function resolveWidgetLabel(type) {
+  if (type in BUILTIN_WIDGETS) {
+    return BUILTIN_WIDGETS[type].label;
+  }
+  return humanizeViewType(type);
+}
+
+// src/homepage-view.ts
+var import_obsidian9 = require("obsidian");
+
+// src/types.ts
+var BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note", "new-note", "create-task", "command", "quick-switcher", "iris-tasks-view"];
+function isBuiltinWidget(type) {
+  return BUILTIN_WIDGET_TYPES.includes(type);
+}
+
+// src/grid-engine.ts
+var MAX_COLS = 32;
+function cellKey(row, col) {
+  return row * MAX_COLS + col;
+}
+var GridEngine = class {
+  constructor(columns) {
+    this.columns = columns;
+  }
+  setColumns(columns) {
+    this.columns = columns;
+  }
+  buildOccupancyMap(widgets, excludeId) {
+    const map = /* @__PURE__ */ new Map();
+    for (const w of widgets) {
+      if (w.id === excludeId) continue;
+      for (let r = w.row; r < w.row + w.height; r++) {
+        for (let c = w.col; c < w.col + w.width; c++) {
+          map.set(cellKey(r, c), w.id);
+        }
+      }
+    }
+    return map;
+  }
+  canPlaceWithMap(map, col, row, width, height) {
+    if (col < 0 || row < 0 || col + width > this.columns) return false;
+    for (let r = row; r < row + height; r++) {
+      for (let c = col; c < col + width; c++) {
+        if (map.has(cellKey(r, c))) return false;
+      }
+    }
+    return true;
+  }
+  removeFromMap(map, widget) {
+    for (let r = widget.row; r < widget.row + widget.height; r++) {
+      for (let c = widget.col; c < widget.col + widget.width; c++) {
+        map.delete(cellKey(r, c));
+      }
+    }
+  }
+  addToMap(map, widget) {
+    for (let r = widget.row; r < widget.row + widget.height; r++) {
+      for (let c = widget.col; c < widget.col + widget.width; c++) {
+        map.set(cellKey(r, c), widget.id);
+      }
+    }
+  }
+  compact(widgets, pinnedId) {
+    const sorted = [...widgets].sort((a, b) => a.row - b.row || a.col - b.col);
+    const map = this.buildOccupancyMap(widgets);
+    for (const widget of sorted) {
+      if (widget.id === pinnedId) continue;
+      this.removeFromMap(map, widget);
+      let targetRow = 0;
+      while (targetRow < widget.row) {
+        if (this.canPlaceWithMap(map, widget.col, targetRow, widget.width, widget.height)) {
+          widget.row = targetRow;
+          break;
+        }
+        targetRow++;
+      }
+      this.addToMap(map, widget);
+    }
+  }
+  clamp(widget) {
+    widget.width = Math.min(widget.width, this.columns);
+    widget.width = Math.max(widget.width, 1);
+    widget.height = Math.max(widget.height, 1);
+    if (widget.col + widget.width > this.columns) {
+      widget.col = this.columns - widget.width;
+    }
+    if (widget.col < 0) widget.col = 0;
+    if (widget.row < 0) widget.row = 0;
+  }
+  findFirstAvailable(widgets, width, height) {
+    const map = this.buildOccupancyMap(widgets);
+    const maxRow = this.getMaxRow(widgets) + 2;
+    for (let row = 0; row <= maxRow; row++) {
+      for (let col = 0; col <= this.columns - width; col++) {
+        if (this.canPlaceWithMap(map, col, row, width, height)) {
+          return { col, row };
+        }
+      }
+    }
+    return { col: 0, row: maxRow + 1 };
+  }
+  resolveCollisions(widgets, movedWidget) {
+    const map = this.buildOccupancyMap(widgets, movedWidget.id);
+    const displaced = /* @__PURE__ */ new Set();
+    for (let r = movedWidget.row; r < movedWidget.row + movedWidget.height; r++) {
+      for (let c = movedWidget.col; c < movedWidget.col + movedWidget.width; c++) {
+        const occupant = map.get(cellKey(r, c));
+        if (occupant) displaced.add(occupant);
+      }
+    }
+    if (displaced.size === 0) return;
+    for (const id of displaced) {
+      const w = widgets.find((w2) => w2.id === id);
+      if (!w) continue;
+      w.row = movedWidget.row + movedWidget.height;
+    }
+    this.compactSubset(widgets, displaced);
+  }
+  /** Compact only the given widget IDs, leaving others in place. */
+  compactSubset(widgets, ids) {
+    const sorted = widgets.filter((w) => ids.has(w.id)).sort((a, b) => a.row - b.row || a.col - b.col);
+    const map = this.buildOccupancyMap(widgets);
+    for (const widget of sorted) {
+      this.removeFromMap(map, widget);
+      let targetRow = 0;
+      while (targetRow < widget.row) {
+        if (this.canPlaceWithMap(map, widget.col, targetRow, widget.width, widget.height)) {
+          widget.row = targetRow;
+          break;
+        }
+        targetRow++;
+      }
+      this.addToMap(map, widget);
+    }
+  }
+  getMaxRow(widgets) {
+    let max = 0;
+    for (const w of widgets) {
+      max = Math.max(max, w.row + w.height - 1);
+    }
+    return max;
+  }
+  pixelToCell(x, y, cellWidth, cellHeight) {
+    return {
+      col: Math.max(0, Math.min(this.columns - 1, Math.floor(x / cellWidth))),
+      row: Math.max(0, Math.floor(y / cellHeight))
+    };
+  }
+};
+
+// src/widgets/recent-notes.ts
+var import_obsidian = require("obsidian");
+
+// src/widgets/base-widget.ts
+var BaseWidget = class {
+  constructor(app, containerEl, config, plugin) {
+    this.app = app;
+    this.containerEl = containerEl;
+    this.config = config;
+    this.plugin = plugin;
+    this.bodyEl = this.buildCard();
+  }
+  buildCard() {
+    this.containerEl.empty();
+    this.containerEl.addClass("iris-hp-widget");
+    const bodyEl = this.containerEl.createDiv({ cls: "iris-hp-widget-body" });
+    for (const edge of ["tl", "tr", "bl", "br", "t", "r", "b", "l"]) {
+      const handle = this.containerEl.createDiv({ cls: `iris-hp-resize-handle iris-hp-resize-${edge}` });
+      handle.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.containerEl.dispatchEvent(
+          new CustomEvent("widget-resize-start", { bubbles: true, detail: { widgetId: this.config.id, corner: edge, event: e } })
+        );
+      });
+    }
+    return bodyEl;
+  }
+  destroy() {
+    this.containerEl.empty();
+  }
+};
+
+// src/utils.ts
+var TASK_FOLDER = "Tasks";
+var SECRET_KEY_ANTHROPIC = "anthropic-api-key";
+function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function getApiKey(app) {
+  return app.vault?.secretStorage?.getSecret?.(SECRET_KEY_ANTHROPIC) ?? "";
+}
+function setApiKey(app, value) {
+  app.vault.secretStorage.setSecret(SECRET_KEY_ANTHROPIC, value);
+}
+function buildHiddenFilter(app) {
+  const patterns = app.vault.config?.userIgnoreFilters ?? [];
+  if (patterns.length === 0) return () => false;
+  const regexes = patterns.map((p) => {
+    try {
+      return new RegExp(p);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+  return (path) => regexes.some((re) => re.test(path));
+}
+function getDisplayTitle(app, file) {
+  return app.metadataCache.getFileCache(file)?.frontmatter?.displayTitle ?? file.basename;
+}
+
+// src/widgets/recent-notes.ts
+var RecentNotesWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    this.debounceTimer = null;
+    this.eventRef = null;
+    this.resizeObserver = null;
+    this.lastHeight = 0;
+    this.hiddenFilter = buildHiddenFilter(this.app);
+    this.eventRef = this.app.vault.on("modify", () => {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => this.render(), 1e3);
+    });
+    this.resizeObserver = new ResizeObserver(() => {
+      const h = this.bodyEl.clientHeight;
+      if (Math.abs(h - this.lastHeight) < 4) return;
+      this.lastHeight = h;
+      this.render();
+    });
+    this.resizeObserver.observe(this.bodyEl);
+    this.render();
+  }
+  render() {
+    this.bodyEl.empty();
+    const files = this.getRecentFiles();
+    const itemHeight = 32;
+    const titleHeight = 28;
+    const available = (this.bodyEl.clientHeight || 200) - titleHeight;
+    const max = Math.max(1, Math.floor(available / itemHeight));
+    const displayed = files.slice(0, max);
+    if (displayed.length === 0) {
+      this.bodyEl.createDiv({ cls: "iris-hp-empty", text: "No recent notes" });
+      return;
+    }
+    this.bodyEl.createEl("h6", { cls: "iris-hp-widget-title", text: "Recent notes" });
+    const listEl = this.bodyEl.createDiv({ cls: "iris-hp-list" });
+    for (const file of displayed) {
+      const item = listEl.createDiv({ cls: "iris-hp-list-item" });
+      const self = item.createDiv({ cls: "iris-hp-list-item-self is-clickable" });
+      const inner = self.createDiv({ cls: "iris-hp-list-item-inner" });
+      inner.setText(getDisplayTitle(this.app, file));
+      self.addEventListener("click", () => {
+        this.app.workspace.getLeaf(false).openFile(file);
+      });
+    }
+  }
+  getRecentFiles() {
+    const recentPaths = this.app.workspace.getLastOpenFiles?.() ?? [];
+    const files = [];
+    for (const path of recentPaths) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof import_obsidian.TFile && file.extension === "md" && !this.hiddenFilter(file.path)) {
+        files.push(file);
+      }
+    }
+    return files;
+  }
+  destroy() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.eventRef) {
+      this.app.vault.offref(this.eventRef);
+      this.eventRef = null;
+    }
+    super.destroy();
+  }
+};
+
+// src/widgets/embedded-note.ts
+var import_obsidian2 = require("obsidian");
+var NoteSuggestModal = class extends import_obsidian2.FuzzySuggestModal {
+  constructor(app, files, onChoose) {
+    super(app);
+    this.files = files;
+    this.onChoose = onChoose;
+  }
+  getItems() {
+    return this.files;
+  }
+  getItemText(item) {
+    return item.path;
+  }
+  onChooseItem(item) {
+    this.onChoose(item);
+  }
+};
+var EmbeddedNoteWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    this.modifyRef = null;
+    if (this.config.notePath) {
+      this.modifyRef = this.app.vault.on("modify", (file) => {
+        if (file instanceof import_obsidian2.TFile && file.path === this.config.notePath) {
+          this.render();
+        }
+      });
+    }
+    this.render();
+  }
+  render() {
+    this.bodyEl.empty();
+    if (!this.config.notePath) {
+      this.renderPicker();
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(this.config.notePath);
+    if (!(file instanceof import_obsidian2.TFile)) {
+      this.bodyEl.createDiv({ cls: "iris-hp-empty", text: "Note not found" });
+      return;
+    }
+    const contentEl = this.bodyEl.createDiv({ cls: "iris-hp-embedded-content" });
+    const openBtn = this.bodyEl.createEl("button", {
+      cls: "iris-hp-embedded-open clickable-icon",
+      attr: { "aria-label": "Open note" }
+    });
+    (0, import_obsidian2.setIcon)(openBtn, "external-link");
+    openBtn.addEventListener("click", () => {
+      this.app.workspace.getLeaf(false).openFile(file);
+    });
+    this.app.vault.cachedRead(file).then((content) => {
+      import_obsidian2.MarkdownRenderer.render(this.app, content, contentEl, file.path, this.plugin);
+    });
+  }
+  renderPicker() {
+    const placeholder = this.bodyEl.createDiv({ cls: "iris-hp-embedded-picker" });
+    placeholder.createDiv({ cls: "iris-hp-empty", text: "No note selected" });
+    const chooseBtn = placeholder.createEl("button", {
+      cls: "iris-hp-embedded-choose",
+      text: "Choose note"
+    });
+    chooseBtn.addEventListener("click", () => {
+      const files = this.app.vault.getMarkdownFiles();
+      new NoteSuggestModal(this.app, files, (file) => {
+        this.config.notePath = file.path;
+        this.plugin.saveSettings();
+      }).open();
+    });
+  }
+  destroy() {
+    if (this.modifyRef) {
+      this.app.vault.offref(this.modifyRef);
+      this.modifyRef = null;
+    }
+    super.destroy();
+  }
+};
+
+// src/widgets/new-note.ts
+var import_obsidian3 = require("obsidian");
+var NewNoteWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    this.render();
+  }
+  render() {
+    this.bodyEl.empty();
+    const btn = this.bodyEl.createDiv({ cls: "iris-hp-new-note" });
+    const icon = btn.createDiv({ cls: "iris-hp-new-note-icon" });
+    (0, import_obsidian3.setIcon)(icon, "plus");
+    btn.createDiv({ cls: "iris-hp-new-note-label", text: "New note" });
+    btn.addEventListener("click", () => this.createNote());
+  }
+  async createNote() {
+    const name = this.nextUntitledName();
+    const file = await this.app.vault.create(name, "");
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file);
+  }
+  nextUntitledName() {
+    const existing = new Set(
+      this.app.vault.getFiles().filter((f) => f instanceof import_obsidian3.TFile).map((f) => f.path)
+    );
+    if (!existing.has("Untitled.md")) return "Untitled.md";
+    let i = 1;
+    while (existing.has(`Untitled ${i}.md`)) i++;
+    return `Untitled ${i}.md`;
+  }
+};
+
+// src/widgets/create-task.ts
+var import_obsidian4 = require("obsidian");
+
+// node_modules/chrono-node/dist/esm/types.js
+var Meridiem;
+(function(Meridiem2) {
+  Meridiem2[Meridiem2["AM"] = 0] = "AM";
+  Meridiem2[Meridiem2["PM"] = 1] = "PM";
+})(Meridiem || (Meridiem = {}));
+var Weekday;
+(function(Weekday2) {
+  Weekday2[Weekday2["SUNDAY"] = 0] = "SUNDAY";
+  Weekday2[Weekday2["MONDAY"] = 1] = "MONDAY";
+  Weekday2[Weekday2["TUESDAY"] = 2] = "TUESDAY";
+  Weekday2[Weekday2["WEDNESDAY"] = 3] = "WEDNESDAY";
+  Weekday2[Weekday2["THURSDAY"] = 4] = "THURSDAY";
+  Weekday2[Weekday2["FRIDAY"] = 5] = "FRIDAY";
+  Weekday2[Weekday2["SATURDAY"] = 6] = "SATURDAY";
+})(Weekday || (Weekday = {}));
+var Month;
+(function(Month2) {
+  Month2[Month2["JANUARY"] = 1] = "JANUARY";
+  Month2[Month2["FEBRUARY"] = 2] = "FEBRUARY";
+  Month2[Month2["MARCH"] = 3] = "MARCH";
+  Month2[Month2["APRIL"] = 4] = "APRIL";
+  Month2[Month2["MAY"] = 5] = "MAY";
+  Month2[Month2["JUNE"] = 6] = "JUNE";
+  Month2[Month2["JULY"] = 7] = "JULY";
+  Month2[Month2["AUGUST"] = 8] = "AUGUST";
+  Month2[Month2["SEPTEMBER"] = 9] = "SEPTEMBER";
+  Month2[Month2["OCTOBER"] = 10] = "OCTOBER";
+  Month2[Month2["NOVEMBER"] = 11] = "NOVEMBER";
+  Month2[Month2["DECEMBER"] = 12] = "DECEMBER";
+})(Month || (Month = {}));
+
+// node_modules/chrono-node/dist/esm/utils/dates.js
+function assignSimilarDate(component, target) {
+  component.assign("day", target.getDate());
+  component.assign("month", target.getMonth() + 1);
+  component.assign("year", target.getFullYear());
+}
+function assignSimilarTime(component, target) {
+  component.assign("hour", target.getHours());
+  component.assign("minute", target.getMinutes());
+  component.assign("second", target.getSeconds());
+  component.assign("millisecond", target.getMilliseconds());
+  component.assign("meridiem", target.getHours() < 12 ? Meridiem.AM : Meridiem.PM);
+}
+function implySimilarDate(component, target) {
+  component.imply("day", target.getDate());
+  component.imply("month", target.getMonth() + 1);
+  component.imply("year", target.getFullYear());
+}
+function implySimilarTime(component, target) {
+  component.imply("hour", target.getHours());
+  component.imply("minute", target.getMinutes());
+  component.imply("second", target.getSeconds());
+  component.imply("millisecond", target.getMilliseconds());
+  component.imply("meridiem", target.getHours() < 12 ? Meridiem.AM : Meridiem.PM);
+}
+
+// node_modules/chrono-node/dist/esm/timezone.js
+var TIMEZONE_ABBR_MAP = {
+  ACDT: 630,
+  ACST: 570,
+  ADT: -180,
+  AEDT: 660,
+  AEST: 600,
+  AFT: 270,
+  AKDT: -480,
+  AKST: -540,
+  ALMT: 360,
+  AMST: -180,
+  AMT: -240,
+  ANAST: 720,
+  ANAT: 720,
+  AQTT: 300,
+  ART: -180,
+  AST: -240,
+  AWDT: 540,
+  AWST: 480,
+  AZOST: 0,
+  AZOT: -60,
+  AZST: 300,
+  AZT: 240,
+  BNT: 480,
+  BOT: -240,
+  BRST: -120,
+  BRT: -180,
+  BST: 60,
+  BTT: 360,
+  CAST: 480,
+  CAT: 120,
+  CCT: 390,
+  CDT: -300,
+  CEST: 120,
+  CET: {
+    timezoneOffsetDuringDst: 2 * 60,
+    timezoneOffsetNonDst: 60,
+    dstStart: (year) => getLastWeekdayOfMonth(year, Month.MARCH, Weekday.SUNDAY, 2),
+    dstEnd: (year) => getLastWeekdayOfMonth(year, Month.OCTOBER, Weekday.SUNDAY, 3)
+  },
+  CHADT: 825,
+  CHAST: 765,
+  CKT: -600,
+  CLST: -180,
+  CLT: -240,
+  COT: -300,
+  CST: -360,
+  CT: {
+    timezoneOffsetDuringDst: -5 * 60,
+    timezoneOffsetNonDst: -6 * 60,
+    dstStart: (year) => getNthWeekdayOfMonth(year, Month.MARCH, Weekday.SUNDAY, 2, 2),
+    dstEnd: (year) => getNthWeekdayOfMonth(year, Month.NOVEMBER, Weekday.SUNDAY, 1, 2)
+  },
+  CVT: -60,
+  CXT: 420,
+  ChST: 600,
+  DAVT: 420,
+  EASST: -300,
+  EAST: -360,
+  EAT: 180,
+  ECT: -300,
+  EDT: -240,
+  EEST: 180,
+  EET: 120,
+  EGST: 0,
+  EGT: -60,
+  EST: -300,
+  ET: {
+    timezoneOffsetDuringDst: -4 * 60,
+    timezoneOffsetNonDst: -5 * 60,
+    dstStart: (year) => getNthWeekdayOfMonth(year, Month.MARCH, Weekday.SUNDAY, 2, 2),
+    dstEnd: (year) => getNthWeekdayOfMonth(year, Month.NOVEMBER, Weekday.SUNDAY, 1, 2)
+  },
+  FJST: 780,
+  FJT: 720,
+  FKST: -180,
+  FKT: -240,
+  FNT: -120,
+  GALT: -360,
+  GAMT: -540,
+  GET: 240,
+  GFT: -180,
+  GILT: 720,
+  GMT: 0,
+  GST: 240,
+  GYT: -240,
+  HAA: -180,
+  HAC: -300,
+  HADT: -540,
+  HAE: -240,
+  HAP: -420,
+  HAR: -360,
+  HAST: -600,
+  HAT: -90,
+  HAY: -480,
+  HKT: 480,
+  HLV: -210,
+  HNA: -240,
+  HNC: -360,
+  HNE: -300,
+  HNP: -480,
+  HNR: -420,
+  HNT: -150,
+  HNY: -540,
+  HOVT: 420,
+  ICT: 420,
+  IDT: 180,
+  IOT: 360,
+  IRDT: 270,
+  IRKST: 540,
+  IRKT: 540,
+  IRST: 210,
+  IST: 330,
+  JST: 540,
+  KGT: 360,
+  KRAST: 480,
+  KRAT: 480,
+  KST: 540,
+  KUYT: 240,
+  LHDT: 660,
+  LHST: 630,
+  LINT: 840,
+  MAGST: 720,
+  MAGT: 720,
+  MART: -510,
+  MAWT: 300,
+  MDT: -360,
+  MESZ: 120,
+  MEZ: 60,
+  MHT: 720,
+  MMT: 390,
+  MSD: 240,
+  MSK: 180,
+  MST: -420,
+  MT: {
+    timezoneOffsetDuringDst: -6 * 60,
+    timezoneOffsetNonDst: -7 * 60,
+    dstStart: (year) => getNthWeekdayOfMonth(year, Month.MARCH, Weekday.SUNDAY, 2, 2),
+    dstEnd: (year) => getNthWeekdayOfMonth(year, Month.NOVEMBER, Weekday.SUNDAY, 1, 2)
+  },
+  MUT: 240,
+  MVT: 300,
+  MYT: 480,
+  NCT: 660,
+  NDT: -90,
+  NFT: 690,
+  NOVST: 420,
+  NOVT: 360,
+  NPT: 345,
+  NST: -150,
+  NUT: -660,
+  NZDT: 780,
+  NZST: 720,
+  OMSST: 420,
+  OMST: 420,
+  PDT: -420,
+  PET: -300,
+  PETST: 720,
+  PETT: 720,
+  PGT: 600,
+  PHOT: 780,
+  PHT: 480,
+  PKT: 300,
+  PMDT: -120,
+  PMST: -180,
+  PONT: 660,
+  PST: -480,
+  PT: {
+    timezoneOffsetDuringDst: -7 * 60,
+    timezoneOffsetNonDst: -8 * 60,
+    dstStart: (year) => getNthWeekdayOfMonth(year, Month.MARCH, Weekday.SUNDAY, 2, 2),
+    dstEnd: (year) => getNthWeekdayOfMonth(year, Month.NOVEMBER, Weekday.SUNDAY, 1, 2)
+  },
+  PWT: 540,
+  PYST: -180,
+  PYT: -240,
+  RET: 240,
+  SAMT: 240,
+  SAST: 120,
+  SBT: 660,
+  SCT: 240,
+  SGT: 480,
+  SRT: -180,
+  SST: -660,
+  TAHT: -600,
+  TFT: 300,
+  TJT: 300,
+  TKT: 780,
+  TLT: 540,
+  TMT: 300,
+  TVT: 720,
+  ULAT: 480,
+  UTC: 0,
+  UYST: -120,
+  UYT: -180,
+  UZT: 300,
+  VET: -210,
+  VLAST: 660,
+  VLAT: 660,
+  VUT: 660,
+  WAST: 120,
+  WAT: 60,
+  WEST: 60,
+  WESZ: 60,
+  WET: 0,
+  WEZ: 0,
+  WFT: 720,
+  WGST: -120,
+  WGT: -180,
+  WIB: 420,
+  WIT: 540,
+  WITA: 480,
+  WST: 780,
+  WT: 0,
+  YAKST: 600,
+  YAKT: 600,
+  YAPT: 600,
+  YEKST: 360,
+  YEKT: 360
+};
+function getNthWeekdayOfMonth(year, month, weekday, n, hour = 0) {
+  let dayOfMonth = 0;
+  let i = 0;
+  while (i < n) {
+    dayOfMonth++;
+    const date = new Date(year, month - 1, dayOfMonth);
+    if (date.getDay() === weekday)
+      i++;
+  }
+  return new Date(year, month - 1, dayOfMonth, hour);
+}
+function getLastWeekdayOfMonth(year, month, weekday, hour = 0) {
+  const oneIndexedWeekday = weekday === 0 ? 7 : weekday;
+  const date = new Date(year, month - 1 + 1, 1, 12);
+  const firstWeekdayNextMonth = date.getDay() === 0 ? 7 : date.getDay();
+  let dayDiff;
+  if (firstWeekdayNextMonth === oneIndexedWeekday)
+    dayDiff = 7;
+  else if (firstWeekdayNextMonth < oneIndexedWeekday)
+    dayDiff = 7 + firstWeekdayNextMonth - oneIndexedWeekday;
+  else
+    dayDiff = firstWeekdayNextMonth - oneIndexedWeekday;
+  date.setDate(date.getDate() - dayDiff);
+  return new Date(year, month - 1, date.getDate(), hour);
+}
+function toTimezoneOffset(timezoneInput, date, timezoneOverrides = {}) {
+  if (timezoneInput == null) {
+    return null;
+  }
+  if (typeof timezoneInput === "number") {
+    return timezoneInput;
+  }
+  const matchedTimezone = timezoneOverrides[timezoneInput] ?? TIMEZONE_ABBR_MAP[timezoneInput];
+  if (matchedTimezone == null) {
+    return null;
+  }
+  if (typeof matchedTimezone == "number") {
+    return matchedTimezone;
+  }
+  if (date == null) {
+    return null;
+  }
+  if (date > matchedTimezone.dstStart(date.getFullYear()) && !(date > matchedTimezone.dstEnd(date.getFullYear()))) {
+    return matchedTimezone.timezoneOffsetDuringDst;
+  }
+  return matchedTimezone.timezoneOffsetNonDst;
+}
+
+// node_modules/chrono-node/dist/esm/calculation/duration.js
+var EmptyDuration = {
+  day: 0,
+  second: 0,
+  millisecond: 0
+};
+function addDuration(ref, duration) {
+  let date = new Date(ref);
+  if (duration["y"]) {
+    duration["year"] = duration["y"];
+    delete duration["y"];
+  }
+  if (duration["mo"]) {
+    duration["month"] = duration["mo"];
+    delete duration["mo"];
+  }
+  if (duration["M"]) {
+    duration["month"] = duration["M"];
+    delete duration["M"];
+  }
+  if (duration["w"]) {
+    duration["week"] = duration["w"];
+    delete duration["w"];
+  }
+  if (duration["d"]) {
+    duration["day"] = duration["d"];
+    delete duration["d"];
+  }
+  if (duration["h"]) {
+    duration["hour"] = duration["h"];
+    delete duration["h"];
+  }
+  if (duration["m"]) {
+    duration["minute"] = duration["m"];
+    delete duration["m"];
+  }
+  if (duration["s"]) {
+    duration["second"] = duration["s"];
+    delete duration["s"];
+  }
+  if (duration["ms"]) {
+    duration["millisecond"] = duration["ms"];
+    delete duration["ms"];
+  }
+  if ("year" in duration) {
+    const floor = Math.floor(duration["year"]);
+    date.setFullYear(date.getFullYear() + floor);
+    const remainingFraction = duration["year"] - floor;
+    if (remainingFraction > 0) {
+      duration.month = duration?.month ?? 0;
+      duration.month += remainingFraction * 12;
+    }
+  }
+  if ("quarter" in duration) {
+    const floor = Math.floor(duration["quarter"]);
+    date.setMonth(date.getMonth() + floor * 3);
+  }
+  if ("month" in duration) {
+    const floor = Math.floor(duration["month"]);
+    date.setMonth(date.getMonth() + floor);
+    const remainingFraction = duration["month"] - floor;
+    if (remainingFraction > 0) {
+      duration.week = duration?.week ?? 0;
+      duration.week += remainingFraction * 4;
+    }
+  }
+  if ("week" in duration) {
+    const floor = Math.floor(duration["week"]);
+    date.setDate(date.getDate() + floor * 7);
+    const remainingFraction = duration["week"] - floor;
+    if (remainingFraction > 0) {
+      duration.day = duration?.day ?? 0;
+      duration.day += Math.round(remainingFraction * 7);
+    }
+  }
+  if ("day" in duration) {
+    const floor = Math.floor(duration["day"]);
+    date.setDate(date.getDate() + floor);
+    const remainingFraction = duration["day"] - floor;
+    if (remainingFraction > 0) {
+      duration.hour = duration?.hour ?? 0;
+      duration.hour += Math.round(remainingFraction * 24);
+    }
+  }
+  if ("hour" in duration) {
+    const floor = Math.floor(duration["hour"]);
+    date.setHours(date.getHours() + floor);
+    const remainingFraction = duration["hour"] - floor;
+    if (remainingFraction > 0) {
+      duration.minute = duration?.minute ?? 0;
+      duration.minute += Math.round(remainingFraction * 60);
+    }
+  }
+  if ("minute" in duration) {
+    const floor = Math.floor(duration["minute"]);
+    date.setMinutes(date.getMinutes() + floor);
+    const remainingFraction = duration["minute"] - floor;
+    if (remainingFraction > 0) {
+      duration.second = duration?.second ?? 0;
+      duration.second += Math.round(remainingFraction * 60);
+    }
+  }
+  if ("second" in duration) {
+    const floor = Math.floor(duration["second"]);
+    date.setSeconds(date.getSeconds() + floor);
+    const remainingFraction = duration["second"] - floor;
+    if (remainingFraction > 0) {
+      duration.millisecond = duration?.millisecond ?? 0;
+      duration.millisecond += Math.round(remainingFraction * 1e3);
+    }
+  }
+  if ("millisecond" in duration) {
+    const floor = Math.floor(duration["millisecond"]);
+    date.setMilliseconds(date.getMilliseconds() + floor);
+  }
+  return date;
+}
+function reverseDuration(duration) {
+  const reversed = {};
+  for (const key in duration) {
+    reversed[key] = -duration[key];
+  }
+  return reversed;
+}
+
+// node_modules/chrono-node/dist/esm/results.js
+var ReferenceWithTimezone = class _ReferenceWithTimezone {
+  instant;
+  timezoneOffset;
+  constructor(instant, timezoneOffset) {
+    this.instant = instant ?? /* @__PURE__ */ new Date();
+    this.timezoneOffset = timezoneOffset ?? null;
+  }
+  static fromDate(date) {
+    return new _ReferenceWithTimezone(date);
+  }
+  static fromInput(input, timezoneOverrides) {
+    if (input instanceof Date) {
+      return _ReferenceWithTimezone.fromDate(input);
+    }
+    const instant = input?.instant ?? /* @__PURE__ */ new Date();
+    const timezoneOffset = toTimezoneOffset(input?.timezone, instant, timezoneOverrides);
+    return new _ReferenceWithTimezone(instant, timezoneOffset);
+  }
+  getDateWithAdjustedTimezone() {
+    const date = new Date(this.instant);
+    if (this.timezoneOffset !== null) {
+      date.setMinutes(date.getMinutes() - this.getSystemTimezoneAdjustmentMinute(this.instant));
+    }
+    return date;
+  }
+  getSystemTimezoneAdjustmentMinute(date, overrideTimezoneOffset) {
+    if (!date || date.getTime() < 0) {
+      date = /* @__PURE__ */ new Date();
+    }
+    const currentTimezoneOffset = -date.getTimezoneOffset();
+    const targetTimezoneOffset = overrideTimezoneOffset ?? this.timezoneOffset ?? currentTimezoneOffset;
+    return currentTimezoneOffset - targetTimezoneOffset;
+  }
+  getTimezoneOffset() {
+    return this.timezoneOffset ?? -this.instant.getTimezoneOffset();
+  }
+};
+var ParsingComponents = class _ParsingComponents {
+  knownValues;
+  impliedValues;
+  reference;
+  _tags = /* @__PURE__ */ new Set();
+  constructor(reference, knownComponents) {
+    this.reference = reference;
+    this.knownValues = {};
+    this.impliedValues = {};
+    if (knownComponents) {
+      for (const key in knownComponents) {
+        this.knownValues[key] = knownComponents[key];
+      }
+    }
+    const date = reference.getDateWithAdjustedTimezone();
+    this.imply("day", date.getDate());
+    this.imply("month", date.getMonth() + 1);
+    this.imply("year", date.getFullYear());
+    this.imply("hour", 12);
+    this.imply("minute", 0);
+    this.imply("second", 0);
+    this.imply("millisecond", 0);
+  }
+  static createRelativeFromReference(reference, duration = EmptyDuration) {
+    let date = addDuration(reference.getDateWithAdjustedTimezone(), duration);
+    const components = new _ParsingComponents(reference);
+    components.addTag("result/relativeDate");
+    if ("hour" in duration || "minute" in duration || "second" in duration || "millisecond" in duration) {
+      components.addTag("result/relativeDateAndTime");
+      assignSimilarTime(components, date);
+      assignSimilarDate(components, date);
+      components.assign("timezoneOffset", reference.getTimezoneOffset());
+    } else {
+      implySimilarTime(components, date);
+      components.imply("timezoneOffset", reference.getTimezoneOffset());
+      if ("day" in duration) {
+        components.assign("day", date.getDate());
+        components.assign("month", date.getMonth() + 1);
+        components.assign("year", date.getFullYear());
+        components.assign("weekday", date.getDay());
+      } else if ("week" in duration) {
+        components.assign("day", date.getDate());
+        components.assign("month", date.getMonth() + 1);
+        components.assign("year", date.getFullYear());
+        components.imply("weekday", date.getDay());
+      } else {
+        components.imply("day", date.getDate());
+        if ("month" in duration) {
+          components.assign("month", date.getMonth() + 1);
+          components.assign("year", date.getFullYear());
+        } else {
+          components.imply("month", date.getMonth() + 1);
+          if ("year" in duration) {
+            components.assign("year", date.getFullYear());
+          } else {
+            components.imply("year", date.getFullYear());
+          }
+        }
+      }
+    }
+    return components;
+  }
+  get(component) {
+    if (component in this.knownValues) {
+      return this.knownValues[component];
+    }
+    if (component in this.impliedValues) {
+      return this.impliedValues[component];
+    }
+    return null;
+  }
+  isCertain(component) {
+    return component in this.knownValues;
+  }
+  getCertainComponents() {
+    return Object.keys(this.knownValues);
+  }
+  imply(component, value) {
+    if (component in this.knownValues) {
+      return this;
+    }
+    this.impliedValues[component] = value;
+    return this;
+  }
+  assign(component, value) {
+    this.knownValues[component] = value;
+    delete this.impliedValues[component];
+    return this;
+  }
+  addDurationAsImplied(duration) {
+    const currentDate = this.dateWithoutTimezoneAdjustment();
+    const date = addDuration(currentDate, duration);
+    if ("day" in duration || "week" in duration || "month" in duration || "year" in duration) {
+      this.delete(["day", "weekday", "month", "year"]);
+      this.imply("day", date.getDate());
+      this.imply("weekday", date.getDay());
+      this.imply("month", date.getMonth() + 1);
+      this.imply("year", date.getFullYear());
+    }
+    if ("second" in duration || "minute" in duration || "hour" in duration) {
+      this.delete(["second", "minute", "hour"]);
+      this.imply("second", date.getSeconds());
+      this.imply("minute", date.getMinutes());
+      this.imply("hour", date.getHours());
+    }
+    return this;
+  }
+  delete(components) {
+    if (typeof components === "string") {
+      components = [components];
+    }
+    for (const component of components) {
+      delete this.knownValues[component];
+      delete this.impliedValues[component];
+    }
+  }
+  clone() {
+    const component = new _ParsingComponents(this.reference);
+    component.knownValues = {};
+    component.impliedValues = {};
+    for (const key in this.knownValues) {
+      component.knownValues[key] = this.knownValues[key];
+    }
+    for (const key in this.impliedValues) {
+      component.impliedValues[key] = this.impliedValues[key];
+    }
+    return component;
+  }
+  isOnlyDate() {
+    return !this.isCertain("hour") && !this.isCertain("minute") && !this.isCertain("second");
+  }
+  isOnlyTime() {
+    return !this.isCertain("weekday") && !this.isCertain("day") && !this.isCertain("month") && !this.isCertain("year");
+  }
+  isOnlyWeekdayComponent() {
+    return this.isCertain("weekday") && !this.isCertain("day") && !this.isCertain("month");
+  }
+  isDateWithUnknownYear() {
+    return this.isCertain("month") && !this.isCertain("year");
+  }
+  isValidDate() {
+    const date = this.dateWithoutTimezoneAdjustment();
+    if (date.getFullYear() !== this.get("year"))
+      return false;
+    if (date.getMonth() !== this.get("month") - 1)
+      return false;
+    if (date.getDate() !== this.get("day"))
+      return false;
+    if (this.get("hour") != null && date.getHours() != this.get("hour"))
+      return false;
+    if (this.get("minute") != null && date.getMinutes() != this.get("minute"))
+      return false;
+    return true;
+  }
+  toString() {
+    return `[ParsingComponents {
             tags: ${JSON.stringify(Array.from(this._tags).sort())}, 
             knownValues: ${JSON.stringify(this.knownValues)}, 
             impliedValues: ${JSON.stringify(this.impliedValues)}}, 
-            reference: ${JSON.stringify(this.reference)}]`}date(){let t=this.dateWithoutTimezoneAdjustment(),e=this.reference.getSystemTimezoneAdjustmentMinute(t,this.get("timezoneOffset"));return new Date(t.getTime()+e*6e4)}addTag(t){return this._tags.add(t),this}addTags(t){for(let e of t)this._tags.add(e);return this}tags(){return new Set(this._tags)}dateWithoutTimezoneAdjustment(){let t=new Date(this.get("year"),this.get("month")-1,this.get("day"),this.get("hour"),this.get("minute"),this.get("second"),this.get("millisecond"));return t.setFullYear(this.get("year")),t}},F=class r{constructor(t,e,i,n,s){p(this,"refDate");p(this,"index");p(this,"text");p(this,"reference");p(this,"start");p(this,"end");this.reference=t,this.refDate=t.instant,this.index=e,this.text=i,this.start=n||new f(t),this.end=s}clone(){let t=new r(this.reference,this.index,this.text);return t.start=this.start?this.start.clone():null,t.end=this.end?this.end.clone():null,t}date(){return this.start.date()}addTag(t){return this.start.addTag(t),this.end&&this.end.addTag(t),this}addTags(t){return this.start.addTags(t),this.end&&this.end.addTags(t),this}tags(){let t=new Set(this.start.tags());if(this.end)for(let e of this.end.tags())t.add(e);return t}toString(){let t=Array.from(this.tags()).sort();return`[ParsingResult {index: ${this.index}, text: '${this.text}', tags: ${JSON.stringify(t)} ...}]`}};function vt(r,t,e="\\s{0,5},?\\s{0,5}"){let i=t.replace(/\((?!\?)/g,"(?:");return`${r}${i}(?:${e}${i}){0,10}`}function zi(r){let t;return r instanceof Array?t=[...r]:r instanceof Map?t=Array.from(r.keys()):t=Object.keys(r),t}function v(r){return`(?:${zi(r).sort((e,i)=>i.length-e.length).join("|").replace(/\./g,"\\.")})`}function Qe(r){return r<100&&(r>50?r=r+1900:r=r+2e3),r}function B(r,t,e){let i=new Date(r);i.setMonth(e-1),i.setDate(t);let n=E(i,{year:1}),s=E(i,{year:-1});return Math.abs(n.getTime()-r.getTime())<Math.abs(i.getTime()-r.getTime())?i=n:Math.abs(s.getTime()-r.getTime())<Math.abs(i.getTime()-r.getTime())&&(i=s),i.getFullYear()}var et={sunday:0,sun:0,"sun.":0,monday:1,mon:1,"mon.":1,tuesday:2,tue:2,"tue.":2,wednesday:3,wed:3,"wed.":3,thursday:4,thurs:4,"thurs.":4,thur:4,"thur.":4,thu:4,"thu.":4,friday:5,fri:5,"fri.":5,saturday:6,sat:6,"sat.":6},Pt={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12},P={...Pt,jan:1,"jan.":1,feb:2,"feb.":2,mar:3,"mar.":3,apr:4,"apr.":4,jun:6,"jun.":6,jul:7,"jul.":7,aug:8,"aug.":8,sep:9,"sep.":9,sept:9,"sept.":9,oct:10,"oct.":10,nov:11,"nov.":11,dec:12,"dec.":12},xt={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12},bt={first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19,twentieth:20,"twenty first":21,"twenty-first":21,"twenty second":22,"twenty-second":22,"twenty third":23,"twenty-third":23,"twenty fourth":24,"twenty-fourth":24,"twenty fifth":25,"twenty-fifth":25,"twenty sixth":26,"twenty-sixth":26,"twenty seventh":27,"twenty-seventh":27,"twenty eighth":28,"twenty-eighth":28,"twenty ninth":29,"twenty-ninth":29,thirtieth:30,"thirty first":31,"thirty-first":31},jt={second:"second",seconds:"second",minute:"minute",minutes:"minute",hour:"hour",hours:"hour",day:"day",days:"day",week:"week",weeks:"week",month:"month",months:"month",quarter:"quarter",quarters:"quarter",year:"year",years:"year"},he={s:"second",sec:"second",second:"second",seconds:"second",m:"minute",min:"minute",mins:"minute",minute:"minute",minutes:"minute",h:"hour",hr:"hour",hrs:"hour",hour:"hour",hours:"hour",d:"day",day:"day",days:"day",w:"week",week:"week",weeks:"week",mo:"month",mon:"month",mos:"month",month:"month",months:"month",qtr:"quarter",quarter:"quarter",quarters:"quarter",y:"year",yr:"year",year:"year",years:"year",...jt},Kt=`(?:${v(xt)}|[0-9]+|[0-9]+\\.[0-9]+|half(?:\\s{0,2}an?)?|an?\\b(?:\\s{0,2}few)?|few|several|the|a?\\s{0,2}couple\\s{0,2}(?:of)?)`;function Vi(r){let t=r.toLowerCase();return xt[t]!==void 0?xt[t]:t==="a"||t==="an"||t=="the"?1:t.match(/few/)?3:t.match(/half/)?.5:t.match(/couple/)?2:t.match(/several/)?7:parseFloat(t)}var te=`(?:${v(bt)}|[0-9]{1,2}(?:st|nd|rd|th)?)`;function ie(r){let t=r.toLowerCase();return bt[t]!==void 0?bt[t]:(t=t.replace(/(?:st|nd|rd|th)$/i,""),parseInt(t))}var z="(?:[1-9][0-9]{0,3}\\s{0,2}(?:BE|AD|BC|BCE|CE)|[1-2][0-9]{3}|[5-9][0-9]|2[0-5])";function V(r){if(/BE/i.test(r))return r=r.replace(/BE/i,""),parseInt(r)-543;if(/BCE?/i.test(r))return r=r.replace(/BCE?/i,""),-parseInt(r);if(/(AD|CE)/i.test(r))return r=r.replace(/(AD|CE)/i,""),parseInt(r);let t=parseInt(r);return Qe(t)}var qt=`(${Kt})\\s{0,3}(${v(he)})`,Gt=new RegExp(qt,"i"),Gi=`(${Kt})\\s{0,3}(${v(jt)})`,Zt="\\s{0,5},?(?:\\s*and)?\\s{0,5}",L=vt("(?:(?:about|around)\\s{0,3})?",qt,Zt),G=vt("(?:(?:about|around)\\s{0,3})?",Gi,Zt);function D(r){let t={},e=r,i=Gt.exec(e);for(;i;)ji(t,i),e=e.substring(i[0].length).trim(),i=Gt.exec(e);return Object.keys(t).length==0?null:t}function ji(r,t){if(t[0].match(/^[a-zA-Z]+$/))return;let e=Vi(t[1]),i=he[t[2].toLowerCase()];r[i]=e}var u=class{constructor(){p(this,"cachedInnerPattern",null);p(this,"cachedPattern",null)}innerPatternHasChange(t,e){return this.innerPattern(t)!==e}patternLeftBoundary(){return"(\\W|^)"}pattern(t){return this.cachedInnerPattern&&!this.innerPatternHasChange(t,this.cachedInnerPattern)?this.cachedPattern:(this.cachedInnerPattern=this.innerPattern(t),this.cachedPattern=new RegExp(`${this.patternLeftBoundary()}${this.cachedInnerPattern.source}`,this.cachedInnerPattern.flags),this.cachedPattern)}extract(t,e){var n;let i=(n=e[1])!=null?n:"";e.index=e.index+i.length,e[0]=e[0].substring(i.length);for(let s=2;s<e.length;s++)e[s-1]=e[s];return this.innerExtract(t,e)}};var Ki=new RegExp(`(?:(?:within|in|for)\\s*)?(?:(?:about|around|roughly|approximately|just)\\s*(?:~\\s*)?)?(${L})(?=\\W|$)`,"i"),qi=new RegExp(`(?:within|in|for)\\s*(?:(?:about|around|roughly|approximately|just)\\s*(?:~\\s*)?)?(${L})(?=\\W|$)`,"i"),Zi=new RegExp(`(?:within|in|for)\\s*(?:(?:about|around|roughly|approximately|just)\\s*(?:~\\s*)?)?(${G})(?=\\W|$)`,"i"),fe=class extends u{constructor(e){super();p(this,"strictMode");this.strictMode=e}innerPattern(e){return this.strictMode?Zi:e.option.forwardDate?Ki:qi}innerExtract(e,i){if(i[0].match(/^for\s*the\s*\w+/))return null;let n=D(i[1]);return n?f.createRelativeFromReference(e.reference,n):null}};var Ji=new RegExp(`(?:on\\s{0,3})?(${te})(?:\\s{0,3}(?:to|\\-|\\\u2013|until|through|till)?\\s{0,3}(${te}))?(?:-|/|\\s{0,3}(?:of)?\\s{0,3})(${v(P)})(?:(?:-|/|,?\\s{0,3})(${z}(?!\\w)))?(?=\\W|$)`,"i"),Jt=1,Xt=2,Xi=3,Qt=4,ge=class extends u{innerPattern(){return Ji}innerExtract(t,e){let i=t.createParsingResult(e.index,e[0]),n=P[e[Xi].toLowerCase()],s=ie(e[Jt]);if(s>31)return e.index=e.index+e[Jt].length,null;if(i.start.assign("month",n),i.start.assign("day",s),e[Qt]){let o=V(e[Qt]);i.start.assign("year",o)}else{let o=B(t.refDate,s,n);i.start.imply("year",o)}if(e[Xt]){let o=ie(e[Xt]);i.end=i.start.clone(),i.end.assign("day",o)}return i}};var Qi=new RegExp(`(${v(P)})(?:-|/|\\s*,?\\s*)(${te})(?!\\s*(?:am|pm))\\s*(?:(?:to|\\-)\\s*(${te})\\s*)?(?:(?:-|/|\\s*,\\s*|\\s+)(${z}))?(?=\\W|$)(?!\\:\\d)`,"i"),en=1,ei=2,Dt=3,At=4,ue=class extends u{constructor(e){super();p(this,"shouldSkipYearLikeDate");this.shouldSkipYearLikeDate=e}innerPattern(){return Qi}innerExtract(e,i){let n=P[i[en].toLowerCase()],s=ie(i[ei]);if(s>31||this.shouldSkipYearLikeDate&&!i[Dt]&&!i[At]&&i[ei].match(/^2[0-5]$/))return null;let o=e.createParsingComponents({day:s,month:n}).addTag("parser/ENMonthNameMiddleEndianParser");if(i[At]){let c=V(i[At]);o.assign("year",c)}else{let c=B(e.refDate,s,n);o.imply("year",c)}if(!i[Dt])return o;let a=ie(i[Dt]),l=e.createParsingResult(i.index,i[0]);return l.start=o,l.end=o.clone(),l.end.assign("day",a),l}};var tn=new RegExp(`((?:in)\\s*)?(${v(P)})\\s*(?:(?:,|-|of)?\\s*(${z})?)?(?=[^\\s\\w]|\\s+[^0-9]|\\s+$|$)`,"i"),nn=1,sn=2,ti=3,ye=class extends u{innerPattern(){return tn}innerExtract(t,e){let i=e[sn].toLowerCase();if(e[0].length<=3&&!Pt[i])return null;let n=t.createParsingResult(e.index+(e[nn]||"").length,e.index+e[0].length);n.start.imply("day",1),n.start.addTag("parser/ENMonthNameParser");let s=P[i];if(n.start.assign("month",s),e[ti]){let o=V(e[ti]);n.start.assign("year",o)}else{let o=B(t.refDate,1,s);n.start.imply("year",o)}return n}};var rn=new RegExp(`([0-9]{4})[-\\.\\/\\s](?:(${v(P)})|([0-9]{1,2}))[-\\.\\/\\s]([0-9]{1,2})(?=\\W|$)`,"i"),on=1,an=2,ii=3,ln=4,Te=class extends u{constructor(e){super();p(this,"strictMonthDateOrder");this.strictMonthDateOrder=e}innerPattern(){return rn}innerExtract(e,i){let n=parseInt(i[on]),s=parseInt(i[ln]),o=i[ii]?parseInt(i[ii]):P[i[an].toLowerCase()];if(o<1||o>12){if(this.strictMonthDateOrder)return null;s>=1&&s<=12&&([o,s]=[s,o])}return s<1||s>31?null:{day:s,month:o,year:n}}};var cn=new RegExp("([0-9]|0[1-9]|1[012])/([0-9]{4})","i"),dn=1,pn=2,we=class extends u{innerPattern(){return cn}innerExtract(t,e){let i=parseInt(e[pn]),n=parseInt(e[dn]);return t.createParsingComponents().imply("day",1).assign("month",n).assign("year",i)}};function mn(r,t,e,i){return new RegExp(`${r}${t}(\\d{1,4})(?:(?:\\.|:|\uFF1A)(\\d{1,2})(?:(?::|\uFF1A)(\\d{2})(?:\\.(\\d{1,6}))?)?)?(?:\\s*(a\\.m\\.|p\\.m\\.|am?|pm?))?${e}`,i)}function hn(r,t){return new RegExp(`^(${r})(\\d{1,4})(?:(?:\\.|\\:|\\\uFF1A)(\\d{1,2})(?:(?:\\.|\\:|\\\uFF1A)(\\d{1,2})(?:\\.(\\d{1,6}))?)?)?(?:\\s*(a\\.m\\.|p\\.m\\.|am?|pm?))?${t}`,"i")}var Mt=2,Z=3,tt=4,it=5,ne=6,nt=class{constructor(t=!1){p(this,"strictMode");p(this,"cachedPrimaryPrefix",null);p(this,"cachedPrimarySuffix",null);p(this,"cachedPrimaryTimePattern",null);p(this,"cachedFollowingPhase",null);p(this,"cachedFollowingSuffix",null);p(this,"cachedFollowingTimePatten",null);this.strictMode=t}patternFlags(){return"i"}primaryPatternLeftBoundary(){return"(^|\\s|T|\\b)"}primarySuffix(){return"(?!/)(?=\\W|$)"}followingSuffix(){return"(?!/)(?=\\W|$)"}pattern(t){return this.getPrimaryTimePatternThroughCache()}extract(t,e){let i=this.extractPrimaryTimeComponents(t,e);if(!i)return e[0].match(/^\d{4}/)?(e.index+=4,null):(e.index+=e[0].length,null);let n=e.index+e[1].length,s=e[0].substring(e[1].length),o=t.createParsingResult(n,s,i);e.index+=e[0].length;let a=t.text.substring(e.index),c=this.getFollowingTimePatternThroughCache().exec(a);return s.match(/^\d{3,4}/)&&c&&(c[0].match(/^\s*([+-])\s*\d{2,4}$/)||c[0].match(/^\s*([+-])\s*\d{2}\W\d{2}/))?null:!c||c[0].match(/^\s*([+-])\s*\d{3,4}$/)?this.checkAndReturnWithoutFollowingPattern(o):(o.end=this.extractFollowingTimeComponents(t,c,o),o.end&&(o.text+=c[0]),this.checkAndReturnWithFollowingPattern(o))}extractPrimaryTimeComponents(t,e,i=!1){let n=t.createParsingComponents(),s=0,o=null,a=parseInt(e[Mt]);if(a>100){if(e[Mt].length==4&&e[Z]==null&&!e[ne]||this.strictMode||e[Z]!=null)return null;s=a%100,a=Math.floor(a/100)}if(a>24)return null;if(e[Z]!=null){if(e[Z].length==1&&!e[ne])return null;s=parseInt(e[Z])}if(s>=60)return null;if(a>12&&(o=h.PM),e[ne]!=null){if(a>12)return null;let l=e[ne][0].toLowerCase();l=="a"&&(o=h.AM,a==12&&(a=0)),l=="p"&&(o=h.PM,a!=12&&(a+=12))}if(n.assign("hour",a),n.assign("minute",s),o!==null?n.assign("meridiem",o):a<12?n.imply("meridiem",h.AM):n.imply("meridiem",h.PM),e[it]!=null){let l=parseInt(e[it].substring(0,3));if(l>=1e3)return null;n.assign("millisecond",l)}if(e[tt]!=null){let l=parseInt(e[tt]);if(l>=60)return null;n.assign("second",l)}return n}extractFollowingTimeComponents(t,e,i){let n=t.createParsingComponents();if(e[it]!=null){let l=parseInt(e[it].substring(0,3));if(l>=1e3)return null;n.assign("millisecond",l)}if(e[tt]!=null){let l=parseInt(e[tt]);if(l>=60)return null;n.assign("second",l)}let s=parseInt(e[Mt]),o=0,a=-1;if(e[Z]!=null?o=parseInt(e[Z]):s>100&&(o=s%100,s=Math.floor(s/100)),o>=60||s>24)return null;if(s>=12&&(a=h.PM),e[ne]!=null){if(s>12)return null;let l=e[ne][0].toLowerCase();l=="a"&&(a=h.AM,s==12&&(s=0,n.isCertain("day")||n.imply("day",n.get("day")+1))),l=="p"&&(a=h.PM,s!=12&&(s+=12)),i.start.isCertain("meridiem")||(a==h.AM?(i.start.imply("meridiem",h.AM),i.start.get("hour")==12&&i.start.assign("hour",0)):(i.start.imply("meridiem",h.PM),i.start.get("hour")!=12&&i.start.assign("hour",i.start.get("hour")+12)))}return n.assign("hour",s),n.assign("minute",o),a>=0?n.assign("meridiem",a):i.start.isCertain("meridiem")&&i.start.get("hour")>12?i.start.get("hour")-12>s?n.imply("meridiem",h.AM):s<=12&&(n.assign("hour",s+12),n.assign("meridiem",h.PM)):s>12?n.imply("meridiem",h.PM):s<=12&&n.imply("meridiem",h.AM),n.date().getTime()<i.start.date().getTime()&&n.imply("day",n.get("day")+1),n}checkAndReturnWithoutFollowingPattern(t){if(t.text.match(/^\d$/)||t.text.match(/^\d\d\d+$/)||t.text.match(/\d[apAP]$/))return null;let e=t.text.match(/[^\d:.](\d[\d.]+)$/);if(e){let i=e[1];if(this.strictMode||i.includes(".")&&!i.match(/\d(\.\d{2})+$/)||parseInt(i)>24)return null}return t}checkAndReturnWithFollowingPattern(t){if(t.text.match(/^\d+-\d+$/))return null;let e=t.text.match(/[^\d:.](\d[\d.]+)\s*-\s*(\d[\d.]+)$/);if(e){if(this.strictMode)return null;let i=e[1],n=e[2];if(n.includes(".")&&!n.match(/\d(\.\d{2})+$/))return null;let s=parseInt(n),o=parseInt(i);if(s>24||o>24)return null}return t}getPrimaryTimePatternThroughCache(){let t=this.primaryPrefix(),e=this.primarySuffix();return this.cachedPrimaryPrefix===t&&this.cachedPrimarySuffix===e?this.cachedPrimaryTimePattern:(this.cachedPrimaryTimePattern=mn(this.primaryPatternLeftBoundary(),t,e,this.patternFlags()),this.cachedPrimaryPrefix=t,this.cachedPrimarySuffix=e,this.cachedPrimaryTimePattern)}getFollowingTimePatternThroughCache(){let t=this.followingPhase(),e=this.followingSuffix();return this.cachedFollowingPhase===t&&this.cachedFollowingSuffix===e?this.cachedFollowingTimePatten:(this.cachedFollowingTimePatten=hn(t,e),this.cachedFollowingPhase=t,this.cachedFollowingSuffix=e,this.cachedFollowingTimePatten)}};var Ee=class extends nt{constructor(t){super(t)}followingPhase(){return"\\s*(?:\\-|\\\u2013|\\~|\\\u301C|to|until|through|till|\\?)\\s*"}primaryPrefix(){return"(?:(?:at|from)\\s*)??"}primarySuffix(){return"(?:\\s*(?:o\\W*clock|at\\s*night|in\\s*the\\s*(?:morning|afternoon)))?(?!/)(?=\\W|$)"}extractPrimaryTimeComponents(t,e){let i=super.extractPrimaryTimeComponents(t,e);if(!i)return i;if(e[0].endsWith("night")){let n=i.get("hour");n>=6&&n<12?(i.assign("hour",i.get("hour")+12),i.assign("meridiem",h.PM)):n<6&&i.assign("meridiem",h.AM)}if(e[0].endsWith("afternoon")){i.assign("meridiem",h.PM);let n=i.get("hour");n>=0&&n<=6&&i.assign("hour",i.get("hour")+12)}return e[0].endsWith("morning")&&(i.assign("meridiem",h.AM),i.get("hour")<12&&i.assign("hour",i.get("hour"))),i.addTag("parser/ENTimeExpressionParser")}extractFollowingTimeComponents(t,e,i){let n=super.extractFollowingTimeComponents(t,e,i);return n&&n.addTag("parser/ENTimeExpressionParser"),n}};var fn=new RegExp(`(${L})\\s{0,5}(?:ago|before|earlier)(?=\\W|$)`,"i"),gn=new RegExp(`(${G})\\s{0,5}(?:ago|before|earlier)(?=\\W|$)`,"i"),ve=class extends u{constructor(e){super();p(this,"strictMode");this.strictMode=e}innerPattern(){return this.strictMode?gn:fn}innerExtract(e,i){let n=D(i[1]);return n?f.createRelativeFromReference(e.reference,H(n)):null}};var un=new RegExp(`(${L})\\s{0,5}(?:later|after|from now|henceforth|forward|out)(?=(?:\\W|$))`,"i"),yn=new RegExp(`(${G})\\s{0,5}(later|after|from now)(?=\\W|$)`,"i"),Tn=1,xe=class extends u{constructor(e){super();p(this,"strictMode");this.strictMode=e}innerPattern(){return this.strictMode?yn:un}innerExtract(e,i){let n=D(i[Tn]);return n?f.createRelativeFromReference(e.reference,n):null}};var se=class{refine(t,e){return e.filter(i=>this.isValid(t,i))}},A=class{refine(t,e){if(e.length<2)return e;let i=[],n=e[0],s=null;for(let o=1;o<e.length;o++){s=e[o];let a=t.text.substring(n.index+n.text.length,s.index);if(!this.shouldMergeResults(a,n,s,t))i.push(n),n=s;else{let l=n,c=s,d=this.mergeResults(a,l,c,t);t.debug(()=>{console.log(`${this.constructor.name} merged ${l} and ${c} into ${d}`)}),n=d}}return n!=null&&i.push(n),i}};var be=class extends A{shouldMergeResults(t,e,i){return!e.end&&!i.end&&t.match(this.patternBetween())!=null}mergeResults(t,e,i){if(!e.start.isOnlyWeekdayComponent()&&!i.start.isOnlyWeekdayComponent()&&(i.start.getCertainComponents().forEach(s=>{e.start.isCertain(s)||e.start.imply(s,i.start.get(s))}),e.start.getCertainComponents().forEach(s=>{i.start.isCertain(s)||i.start.imply(s,e.start.get(s))})),e.start.date()>i.start.date()){let s=e.start.date(),o=i.start.date();i.start.isOnlyWeekdayComponent()&&E(o,{day:7})>s?(o=E(o,{day:7}),i.start.imply("day",o.getDate()),i.start.imply("month",o.getMonth()+1),i.start.imply("year",o.getFullYear())):e.start.isOnlyWeekdayComponent()&&E(s,{day:-7})<o?(s=E(s,{day:-7}),e.start.imply("day",s.getDate()),e.start.imply("month",s.getMonth()+1),e.start.imply("year",s.getFullYear())):i.start.isDateWithUnknownYear()&&E(o,{year:1})>s?(o=E(o,{year:1}),i.start.imply("year",o.getFullYear())):e.start.isDateWithUnknownYear()&&E(s,{year:-1})<o?(s=E(s,{year:-1}),e.start.imply("year",s.getFullYear())):[i,e]=[e,i]}let n=e.clone();return n.start=e.start,n.end=i.start,n.index=Math.min(e.index,i.index),e.index<i.index?n.text=e.text+t+i.text:n.text=i.text+t+e.text,n}};var Pe=class extends be{patternBetween(){return/^\s*(to|-|–|until|through|till)\s*$/i}};function Rt(r,t){let e=r.clone(),i=r.start,n=t.start;if(e.start=ni(i,n),r.end!=null||t.end!=null){let s=r.end==null?r.start:r.end,o=t.end==null?t.start:t.end,a=ni(s,o);if(r.end==null&&a.date().getTime()<e.start.date().getTime()){let l=new Date(a.date().getTime());l.setDate(l.getDate()+1),a.isCertain("day")?M(a,l):$(a,l)}e.end=a}return e}function ni(r,t){let e=r.clone();return t.isCertain("hour")?(e.assign("hour",t.get("hour")),e.assign("minute",t.get("minute")),t.isCertain("second")?(e.assign("second",t.get("second")),t.isCertain("millisecond")?e.assign("millisecond",t.get("millisecond")):e.imply("millisecond",t.get("millisecond"))):(e.imply("second",t.get("second")),e.imply("millisecond",t.get("millisecond")))):(e.imply("hour",t.get("hour")),e.imply("minute",t.get("minute")),e.imply("second",t.get("second")),e.imply("millisecond",t.get("millisecond"))),t.isCertain("timezoneOffset")&&e.assign("timezoneOffset",t.get("timezoneOffset")),t.isCertain("meridiem")?e.assign("meridiem",t.get("meridiem")):t.get("meridiem")!=null&&e.get("meridiem")==null&&e.imply("meridiem",t.get("meridiem")),e.get("meridiem")==h.PM&&e.get("hour")<12&&(t.isCertain("hour")?e.assign("hour",e.get("hour")+12):e.imply("hour",e.get("hour")+12)),e.addTags(r.tags()),e.addTags(t.tags()),e}var De=class extends A{shouldMergeResults(t,e,i){return(e.start.isOnlyDate()&&i.start.isOnlyTime()||i.start.isOnlyDate()&&e.start.isOnlyTime())&&t.match(this.patternBetween())!=null}mergeResults(t,e,i){let n=e.start.isOnlyDate()?Rt(e,i):Rt(i,e);return n.index=e.index,n.text=e.text+t+i.text,n}};var re=class extends De{patternBetween(){return new RegExp("^\\s*(T|at|after|before|on|of|,|-|\\.|\u2219|:)?\\s*$")}};var wn=new RegExp("^\\s*,?\\s*\\(?([A-Z]{2,4})\\)?(?=\\W|$)","i"),Ae=class{constructor(t){p(this,"timezoneOverrides");this.timezoneOverrides=t}refine(t,e){var n;let i=(n=t.option.timezones)!=null?n:{};return e.forEach(s=>{var w,C;let o=t.text.substring(s.index+s.text.length),a=wn.exec(o);if(!a)return;let l=a[1].toUpperCase(),c=(C=(w=s.start.date())!=null?w:s.refDate)!=null?C:new Date,d={...this.timezoneOverrides,...i},m=Xe(l,c,d);if(m==null)return;t.debug(()=>{console.log(`Extracting timezone: '${l}' into: ${m} for: ${s.start}`)});let g=s.start.get("timezoneOffset");g!==null&&m!=g&&(s.start.isCertain("timezoneOffset")||l!=a[1])||s.start.isOnlyDate()&&l!=a[1]||(s.text+=a[0],s.start.isCertain("timezoneOffset")||s.start.assign("timezoneOffset",m),s.end!=null&&!s.end.isCertain("timezoneOffset")&&s.end.assign("timezoneOffset",m))}),e}};var En=new RegExp("^\\s*(?:\\(?(?:GMT|UTC)\\s?)?([+-])(\\d{1,2})(?::?(\\d{2}))?\\)?","i"),vn=1,xn=2,bn=3,Me=class{refine(t,e){return e.forEach(function(i){if(i.start.isCertain("timezoneOffset"))return;let n=t.text.substring(i.index+i.text.length),s=En.exec(n);if(!s)return;t.debug(()=>{console.log(`Extracting timezone: '${s[0]}' into : ${i}`)});let o=parseInt(s[xn]),a=parseInt(s[bn]||"0"),l=o*60+a;l>14*60||(s[vn]==="-"&&(l=-l),i.end!=null&&i.end.assign("timezoneOffset",l),i.start.assign("timezoneOffset",l),i.text+=s[0])}),e}};var j=class{refine(t,e){if(e.length<2)return e;let i=[],n=e[0];for(let s=1;s<e.length;s++){let o=e[s];if(o.index>=n.index+n.text.length){i.push(n),n=o;continue}let a=null,l=null;o.text.length>n.text.length?(a=o,l=n):(a=n,l=o),t.debug(()=>{console.log(`${this.constructor.name} remove ${l} by ${a}`)}),n=a}return n!=null&&i.push(n),i}};var Re=class{refine(t,e){return t.option.forwardDate&&e.forEach(i=>{let n=t.reference.getDateWithAdjustedTimezone();if(i.start.isOnlyTime()&&t.reference.instant>i.start.date()){let s=t.reference.getDateWithAdjustedTimezone(),o=new Date(s);o.setDate(o.getDate()+1),$(i.start,o),t.debug(()=>{console.log(`${this.constructor.name} adjusted ${i} time from the ref date (${s}) to the following day (${o})`)}),i.end&&i.end.isOnlyTime()&&($(i.end,o),i.start.date()>i.end.date()&&(o.setDate(o.getDate()+1),$(i.end,o)))}if(i.start.isOnlyWeekdayComponent()&&n>i.start.date()){let s=i.start.get("weekday")-n.getDay();if(s<=0&&(s+=7),n=E(n,{day:s}),$(i.start,n),t.debug(()=>{console.log(`${this.constructor.name} adjusted ${i} weekday (${i.start})`)}),i.end&&i.end.isOnlyWeekdayComponent()){let o=i.end.get("weekday")-n.getDay();o<=0&&(o+=7),n=E(n,{day:o}),$(i.end,n),t.debug(()=>{console.log(`${this.constructor.name} adjusted ${i} weekday (${i.end})`)})}}if(i.start.isDateWithUnknownYear()&&n>i.start.date())for(let s=0;s<3&&n>i.start.date();s++)i.start.imply("year",i.start.get("year")+1),t.debug(()=>{console.log(`${this.constructor.name} adjusted ${i} year (${i.start})`)}),i.end&&!i.end.isCertain("year")&&(i.end.imply("year",i.end.get("year")+1),t.debug(()=>{console.log(`${this.constructor.name} adjusted ${i} month (${i.start})`)}))}),e}};var Ce=class extends se{constructor(e){super();p(this,"strictMode");this.strictMode=e}isValid(e,i){return i.text.replace(" ","").match(/^\d*(\.\d*)?$/)?(e.debug(()=>{console.log(`Removing unlikely result '${i.text}'`)}),!1):i.start.isValidDate()?i.end&&!i.end.isValidDate()?(e.debug(()=>{console.log(`Removing invalid result: ${i} (${i.end})`)}),!1):this.strictMode?this.isStrictModeValid(e,i):!0:(e.debug(()=>{console.log(`Removing invalid result: ${i} (${i.start})`)}),!1)}isStrictModeValid(e,i){return i.start.isOnlyWeekdayComponent()?(e.debug(()=>{console.log(`(Strict) Removing weekday only component: ${i} (${i.end})`)}),!1):!0}};var Pn=new RegExp("([0-9]{4})\\-([0-9]{1,2})\\-([0-9]{1,2})(?:T([0-9]{1,2}):([0-9]{1,2})(?::([0-9]{1,2})(?:\\.(\\d{1,4}))?)?(Z|([+-]\\d{2}):?(\\d{2})?)?)?(?=\\W|$)","i"),Dn=1,An=2,Mn=3,si=4,Rn=5,ri=6,oi=7,Cn=8,ai=9,li=10,Oe=class extends u{innerPattern(){return Pn}innerExtract(t,e){let i=t.createParsingComponents({year:parseInt(e[Dn]),month:parseInt(e[An]),day:parseInt(e[Mn])});if(e[si]!=null&&(i.assign("hour",parseInt(e[si])),i.assign("minute",parseInt(e[Rn])),e[ri]!=null&&i.assign("second",parseInt(e[ri])),e[oi]!=null&&i.assign("millisecond",parseInt(e[oi])),e[Cn]!=null)){let n=0;if(e[ai]){let s=parseInt(e[ai]),o=0;e[li]!=null&&(o=parseInt(e[li])),n=s*60,n<0?n-=o:n+=o}i.assign("timezoneOffset",n)}return i.addTag("parser/ISOFormatParser")}};var Se=class extends A{mergeResults(t,e,i){let n=i.clone();return n.index=e.index,n.text=e.text+t+n.text,n.start.assign("weekday",e.start.get("weekday")),n.end&&n.end.assign("weekday",e.start.get("weekday")),n}shouldMergeResults(t,e,i){return e.start.isOnlyWeekdayComponent()&&!e.start.isCertain("hour")&&i.start.isCertain("day")&&t.match(/^,?\s*$/)!=null}};function ci(r,t=!1){return r.parsers.unshift(new Oe),r.refiners.unshift(new Se),r.refiners.unshift(new Me),r.refiners.unshift(new j),r.refiners.push(new Ae),r.refiners.push(new j),r.refiners.push(new Re),r.refiners.push(new Ce(t)),r}function di(r){let t=r.getDateWithAdjustedTimezone(),e=new f(r,{});return M(e,t),Je(e,t),e.assign("timezoneOffset",r.getTimezoneOffset()),e.addTag("casualReference/now"),e}function pi(r){let t=r.getDateWithAdjustedTimezone(),e=new f(r,{});return M(e,t),me(e,t),e.delete("meridiem"),e.addTag("casualReference/today"),e}function mi(r){return On(r,1).addTag("casualReference/yesterday")}function hi(r){return st(r,1).addTag("casualReference/tomorrow")}function On(r,t){return st(r,-t)}function st(r,t){let e=r.getDateWithAdjustedTimezone(),i=new f(r,{}),n=new Date(e.getTime());return n.setDate(n.getDate()+t),M(i,n),me(i,n),i.delete("meridiem"),i}function fi(r,t=22){let e=r.getDateWithAdjustedTimezone(),i=new f(r,{});return M(i,e),i.imply("hour",t),i.imply("meridiem",h.PM),i.addTag("casualReference/tonight"),i}function gi(r,t=20){let e=new f(r,{});return e.imply("meridiem",h.PM),e.imply("hour",t),e.addTag("casualReference/evening"),e}function ui(r){let t=new f(r,{});return r.getDateWithAdjustedTimezone().getHours()>2&&t.addDurationAsImplied({day:1}),t.assign("hour",0),t.imply("minute",0),t.imply("second",0),t.imply("millisecond",0),t.addTag("casualReference/midnight"),t}function yi(r,t=6){let e=new f(r,{});return e.imply("meridiem",h.AM),e.imply("hour",t),e.imply("minute",0),e.imply("second",0),e.imply("millisecond",0),e.addTag("casualReference/morning"),e}function Ti(r,t=15){let e=new f(r,{});return e.imply("meridiem",h.PM),e.imply("hour",t),e.imply("minute",0),e.imply("second",0),e.imply("millisecond",0),e.addTag("casualReference/afternoon"),e}function wi(r){let t=new f(r,{});return t.imply("meridiem",h.AM),t.assign("hour",12),t.imply("minute",0),t.imply("second",0),t.imply("millisecond",0),t.addTag("casualReference/noon"),t}var Sn=/(now|today|tonight|tomorrow|overmorrow|tmr|tmrw|yesterday|last\s*night)(?=\W|$)/i,Ie=class extends u{innerPattern(t){return Sn}innerExtract(t,e){let i=t.refDate,n=e[0].toLowerCase(),s=t.createParsingComponents();switch(n){case"now":s=di(t.reference);break;case"today":s=pi(t.reference);break;case"yesterday":s=mi(t.reference);break;case"tomorrow":case"tmr":case"tmrw":s=hi(t.reference);break;case"tonight":s=fi(t.reference);break;case"overmorrow":s=st(t.reference,2);break;default:if(n.match(/last\s*night/)){if(i.getHours()>6){let o=new Date(i.getTime());o.setDate(o.getDate()-1),i=o}M(s,i),s.imply("hour",0)}break}return s.addTag("parser/ENCasualDateParser"),s}};var In=/(?:this)?\s{0,3}(morning|afternoon|evening|night|midnight|midday|noon)(?=\W|$)/i,Ne=class extends u{innerPattern(){return In}innerExtract(t,e){let i=null;switch(e[1].toLowerCase()){case"afternoon":i=Ti(t.reference);break;case"evening":case"night":i=gi(t.reference);break;case"midnight":i=ui(t.reference);break;case"morning":i=yi(t.reference);break;case"noon":case"midday":i=wi(t.reference);break}return i&&i.addTag("parser/ENCasualTimeParser"),i}};function vi(r,t,e){let i=r.getDateWithAdjustedTimezone(),n=Nn(i,t,e),s=new f(r);return s=s.addDurationAsImplied({day:n}),s.assign("weekday",t),s}function Nn(r,t,e){let i=r.getDay();switch(e){case"this":return rt(r,t);case"last":return xi(r,t);case"next":return i==y.SUNDAY?t==y.SUNDAY?7:t:i==y.SATURDAY?t==y.SATURDAY?7:t==y.SUNDAY?8:1+t:t<i&&t!=y.SUNDAY?rt(r,t):rt(r,t)+7}return kn(r,t)}function kn(r,t){let e=xi(r,t),i=rt(r,t);return i<-e?i:e}function rt(r,t){let e=r.getDay(),i=t-e;return i<0&&(i+=7),i}function xi(r,t){let e=r.getDay(),i=t-e;return i>=0&&(i-=7),i}var Wn=new RegExp(`(?:(?:\\,|\\(|\\\uFF08)\\s*)?(?:on\\s*?)?(?:(this|last|past|next)\\s*)?(${v(et)}|weekend|weekday)(?:\\s*(?:\\,|\\)|\\\uFF09))?(?:\\s*(this|last|past|next)\\s*week)?(?=\\W|$)`,"i"),_n=1,$n=2,Fn=3,ke=class extends u{innerPattern(){return Wn}innerExtract(t,e){let i=e[_n],n=e[Fn],s=i||n;s=s||"",s=s.toLowerCase();let o=null;s=="last"||s=="past"?o="last":s=="next"?o="next":s=="this"&&(o="this");let a=e[$n].toLowerCase(),l;if(et[a]!==void 0)l=et[a];else if(a=="weekend")l=o=="last"?y.SUNDAY:y.SATURDAY;else if(a=="weekday"){let c=t.reference.getDateWithAdjustedTimezone().getDay();c==y.SUNDAY||c==y.SATURDAY?l=o=="last"?y.FRIDAY:y.MONDAY:(l=c-1,l=o=="last"?l-1:l+1,l=l%5+1)}else return null;return vi(t.reference,l,o)}};var Ln=new RegExp(`(this|last|past|next|after\\s*this)\\s*(${v(he)})(?=\\s*)(?=\\W|$)`,"i"),Un=1,Hn=2,We=class extends u{innerPattern(){return Ln}innerExtract(t,e){let i=e[Un].toLowerCase(),n=e[Hn].toLowerCase(),s=he[n];if(i=="next"||i.startsWith("after")){let l={};return l[s]=1,f.createRelativeFromReference(t.reference,l)}if(i=="last"||i=="past"){let l={};return l[s]=-1,f.createRelativeFromReference(t.reference,l)}let o=t.createParsingComponents(),a=new Date(t.reference.instant.getTime());return n.match(/week/i)?(a.setDate(a.getDate()-a.getDay()),o.imply("day",a.getDate()),o.imply("month",a.getMonth()+1),o.imply("year",a.getFullYear())):n.match(/month/i)?(a.setDate(1),o.imply("day",a.getDate()),o.assign("year",a.getFullYear()),o.assign("month",a.getMonth()+1)):n.match(/year/i)&&(a.setDate(1),a.setMonth(0),o.imply("day",a.getDate()),o.imply("month",a.getMonth()+1),o.assign("year",a.getFullYear())),o}};var Yn=new RegExp("([^\\d]|^)([0-3]{0,1}[0-9]{1})[\\/\\.\\-]([0-3]{0,1}[0-9]{1})(?:[\\/\\.\\-]([0-9]{4}|[0-9]{2}))?(\\W|$)","i"),Bn=1,zn=5,bi=2,Pi=3,Ct=4,_e=class{constructor(t){p(this,"groupNumberMonth");p(this,"groupNumberDay");this.groupNumberMonth=t?Pi:bi,this.groupNumberDay=t?bi:Pi}pattern(){return Yn}extract(t,e){let i=e.index+e[Bn].length,n=e.index+e[0].length-e[zn].length;if(i>0&&t.text.substring(0,i).match("\\d/?$")||n<t.text.length&&t.text.substring(n).match("^/?\\d"))return;let s=t.text.substring(i,n);if(s.match(/^\d\.\d$/)||s.match(/^\d\.\d{1,2}\.\d{1,2}\s*$/)||!e[Ct]&&s.indexOf("/")<0)return;let o=t.createParsingResult(i,s),a=parseInt(e[this.groupNumberMonth]),l=parseInt(e[this.groupNumberDay]);if((a<1||a>12)&&a>12)if(l>=1&&l<=12&&a<=31)[l,a]=[a,l];else return null;if(l<1||l>31)return null;if(o.start.assign("day",l),o.start.assign("month",a),e[Ct]){let c=parseInt(e[Ct]),d=Qe(c);o.start.assign("year",d)}else{let c=B(t.refDate,l,a);o.start.imply("year",c)}return o.addTag("parser/SlashDateFormatParser")}};var Vn=new RegExp(`(this|last|past|next|after|\\+|-)\\s*(${L})(?=\\W|$)`,"i"),Gn=new RegExp(`(this|last|past|next|after|\\+|-)\\s*(${G})(?=\\W|$)`,"i"),$e=class extends u{constructor(e=!0){super();p(this,"allowAbbreviations");this.allowAbbreviations=e}innerPattern(){return this.allowAbbreviations?Vn:Gn}innerExtract(e,i){let n=i[1].toLowerCase(),s=D(i[2]);if(!s)return null;switch(n){case"last":case"past":case"-":s=H(s);break}return f.createRelativeFromReference(e.reference,s)}};function jn(r){return r.text.match(/^[+-]/i)!=null}function Di(r){return r.text.match(/^-/i)!=null}var Fe=class extends A{shouldMergeResults(t,e,i){return t.match(/^\s*$/i)?jn(i)||Di(i):!1}mergeResults(t,e,i,n){let s=D(i.text);Di(i)&&(s=H(s));let o=f.createRelativeFromReference(Y.fromDate(e.start.date()),s);return new F(e.reference,e.index,`${e.text}${t}${i.text}`,o)}};function Ai(r){return r.text.match(/\s+(before|from)$/i)!=null}function Kn(r){return r.text.match(/\s+(after|since)$/i)!=null}var Le=class extends A{patternBetween(){return/^\s*$/i}shouldMergeResults(t,e,i){return!t.match(this.patternBetween())||!Ai(e)&&!Kn(e)?!1:!!i.start.get("day")&&!!i.start.get("month")&&!!i.start.get("year")}mergeResults(t,e,i){let n=D(e.text);Ai(e)&&(n=H(n));let s=f.createRelativeFromReference(Y.fromDate(i.start.date()),n);return new F(i.reference,e.index,`${e.text}${t}${i.text}`,s)}};var qn=new RegExp(`^\\s*(${z})`,"i"),Zn=1,Ue=class{refine(t,e){return e.forEach(function(i){if(!i.start.isDateWithUnknownYear())return;let n=t.text.substring(i.index+i.text.length),s=qn.exec(n);if(!s||s[0].trim().length<=3)return;t.debug(()=>{console.log(`Extracting year: '${s[0]}' into : ${i}`)});let o=V(s[Zn]);i.end!=null&&i.end.assign("year",o),i.start.assign("year",o),i.text+=s[0]}),e}};var He=class extends se{constructor(){super()}isValid(t,e){let i=e.text.trim();return i===t.text.trim()?!0:i.toLowerCase()==="may"&&!t.text.substring(0,e.index).trim().match(/\b(in)$/i)?(t.debug(()=>{console.log(`Removing unlikely result: ${e}`)}),!1):i.toLowerCase().endsWith("the second")?(t.text.substring(e.index+e.text.length).trim().length>0&&t.debug(()=>{console.log(`Removing unlikely result: ${e}`)}),!1):!0}};var J=class{createCasualConfiguration(t=!1){let e=this.createConfiguration(!1,t);return e.parsers.push(new Ie),e.parsers.push(new Ne),e.parsers.push(new ye),e.parsers.push(new We),e.parsers.push(new $e),e.refiners.push(new He),e}createConfiguration(t=!0,e=!1){let i=ci({parsers:[new _e(e),new fe(t),new ge,new ue(e),new ke,new we,new Ee(t),new ve(t),new xe(t)],refiners:[new re]},t);return i.parsers.unshift(new Te(t)),i.refiners.unshift(new Le),i.refiners.unshift(new Fe),i.refiners.unshift(new j),i.refiners.push(new re),i.refiners.push(new Ue),i.refiners.push(new Pe),i}};var oe=class r{constructor(t){p(this,"parsers");p(this,"refiners");p(this,"defaultConfig",new J);t=t||this.defaultConfig.createCasualConfiguration(),this.parsers=[...t.parsers],this.refiners=[...t.refiners]}clone(){return new r({parsers:[...this.parsers],refiners:[...this.refiners]})}parseDate(t,e,i){let n=this.parse(t,e,i);return n.length>0?n[0].start.date():null}parse(t,e,i){let n=new Ot(t,e,i),s=[];return this.parsers.forEach(o=>{let a=r.executeParser(n,o);s=s.concat(a)}),s.sort((o,a)=>o.index-a.index),this.refiners.forEach(function(o){s=o.refine(n,s)}),s}static executeParser(t,e){let i=[],n=e.pattern(t),s=t.text,o=t.text,a=n.exec(o);for(;a;){let l=a.index+s.length-o.length;a.index=l;let c=e.extract(t,a);if(!c){o=s.substring(a.index+1),a=n.exec(o);continue}let d=null;c instanceof F?d=c:c instanceof f?(d=t.createParsingResult(a.index,a[0]),d.start=c):d=t.createParsingResult(a.index,a[0],c);let m=d.index,g=d.text;t.debug(()=>console.log(`${e.constructor.name} extracted (at index=${m}) '${g}'`)),i.push(d),o=s.substring(m+g.length),a=n.exec(o)}return i}},Ot=class{constructor(t,e,i){p(this,"text");p(this,"option");p(this,"reference");p(this,"refDate");this.text=t,this.option=i!=null?i:{},this.reference=Y.fromInput(e,this.option.timezones),this.refDate=this.reference.instant}createParsingComponents(t){return t instanceof f?t:new f(this.reference,t)}createParsingResult(t,e,i,n){let s=typeof e=="string"?e:this.text.substring(t,e),o=i?this.createParsingComponents(i):null,a=n?this.createParsingComponents(n):null;return new F(this.reference,t,s,o,a)}debug(t){this.option.debug&&(this.option.debug instanceof Function?this.option.debug(t):this.option.debug.debug(t))}};var St=new J,Mi=new oe(St.createCasualConfiguration(!1)),Jn=new oe(St.createConfiguration(!0,!1)),La=new oe(St.createCasualConfiguration(!0));var Qn=Mi;function Ri(r,t,e){return Qn.parse(r,t,e)}var ot=class extends x{constructor(e,i,n,s){super(e,i,n,s);this.popover=null;this.onDocClick=e=>this.handleOutsideClick(e);this.render()}render(){this.bodyEl.empty();let e=this.bodyEl.createDiv({cls:"iris-hp-create-task"}),i=e.createDiv({cls:"iris-hp-create-task-icon"});(0,ae.setIcon)(i,"check-square"),e.createDiv({cls:"iris-hp-create-task-label",text:"Create task"}),e.addEventListener("click",()=>this.togglePopover())}togglePopover(){if(this.popover){this.closePopover();return}this.openPopover()}openPopover(){let e=this.containerEl.createDiv({cls:"iris-hp-task-popover"});this.popover=e;let i=this.addField(e,"","Task name\u2026"),n=this.addField(e,"Due","tomorrow 3pm, next Friday\u2026");e.createEl("button",{cls:"iris-hp-task-submit",text:"Create"}).addEventListener("click",o=>{o.preventDefault(),o.stopPropagation(),this.submit(i,n)}),e.addEventListener("mousedown",o=>o.stopPropagation()),e.addEventListener("click",o=>o.stopPropagation()),setTimeout(()=>document.addEventListener("click",this.onDocClick),0),i.focus()}addField(e,i,n){let s=e.createDiv({cls:"iris-hp-task-field"});i&&s.createEl("label",{text:i});let o=s.createEl("input",{type:"text"});return n&&(o.placeholder=n),o}async submit(e,i){let n=e.value.trim();if(!n){new ae.Notice("Task title is required");return}let s=["---"],o=i.value.trim();if(o){let c=await this.parseDate(o);if(!c){new ae.Notice("Couldn't understand that date");return}s.push(`closes: ${c.date}`),c.time&&s.push(`closeTime: "${c.time}"`)}s.push(`displayTitle: "${n}"`),s.push("status: ","---",""),await this.ensureFolder();let a=n.replace(/[\\/:*?"<>|]/g,"_"),l=`${ee}/${a}.md`;if(this.app.vault.getAbstractFileByPath(l)){let c=1;for(;this.app.vault.getAbstractFileByPath(`${ee}/${a} ${c}.md`);)c++;l=`${ee}/${a} ${c}.md`}await this.app.vault.create(l,s.join(`
-`)),new ae.Notice(`Task "${n}" created`),this.closePopover()}closePopover(){document.removeEventListener("click",this.onDocClick),this.popover&&(this.popover.remove(),this.popover=null)}handleOutsideClick(e){this.popover&&!this.popover.contains(e.target)&&this.closePopover()}async parseDate(e){var s,o,a;let i=Ri(e);if(i.length>0){let l=i[0].start,c=l.date(),d=null;if(l.isCertain("hour")){let m=String(c.getHours()).padStart(2,"0"),g=String(c.getMinutes()).padStart(2,"0");d=`${m}:${g}`}return{date:Tt(c),time:d}}let n=ze(this.app);if(!n)return null;try{let l=Tt(new Date),c=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"x-api-key":n,"anthropic-version":"2023-06-01","content-type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:64,messages:[{role:"user",content:`Today is ${l}. Parse this into a date and optional time. Return ONLY valid JSON: {"date":"YYYY-MM-DD","time":"HH:mm"} or {"date":"YYYY-MM-DD","time":null}. Input: "${e}"`}]})});if(!c.ok)return null;let d=await c.json(),g=((a=(o=(s=d==null?void 0:d.content)==null?void 0:s[0])==null?void 0:o.text)!=null?a:"").match(/\{[^}]+\}/);if(!g)return null;let w=JSON.parse(g[0]);return!w.date||!/^\d{4}-\d{2}-\d{2}$/.test(w.date)?null:{date:w.date,time:w.time||null}}catch(l){return null}}async ensureFolder(){this.app.vault.getAbstractFileByPath(ee)||await this.app.vault.createFolder(ee)}destroy(){this.closePopover(),super.destroy()}};var le=require("obsidian");var It=class extends le.FuzzySuggestModal{constructor(t,e,i){super(t),this.commands=e,this.onChoose=i}getItems(){return this.commands}getItemText(t){return t.name}onChooseItem(t){this.onChoose(t)}},at=class extends x{constructor(t,e,i,n){super(t,e,i,n);let s=this.containerEl.createEl("button",{cls:"iris-hp-widget-configure clickable-icon",attr:{"aria-label":"Set command"}});(0,le.setIcon)(s,"terminal"),s.addEventListener("click",o=>{o.stopPropagation(),this.openCommandPicker()}),this.render()}render(){var s,o;if(this.bodyEl.empty(),!this.config.commandId){let a=this.bodyEl.createDiv({cls:"iris-hp-command"}),l=a.createDiv({cls:"iris-hp-command-icon"});(0,le.setIcon)(l,"terminal"),a.createDiv({cls:"iris-hp-command-label",text:"No command set"});return}let t=this.getCommand(this.config.commandId),e=(s=t==null?void 0:t.name)!=null?s:this.config.commandId,i=this.bodyEl.createDiv({cls:"iris-hp-command",attr:{"aria-label":e}}),n=i.createDiv({cls:"iris-hp-command-icon"});(0,le.setIcon)(n,(o=t==null?void 0:t.icon)!=null?o:"terminal"),i.createDiv({cls:"iris-hp-command-label",text:e}),i.addEventListener("click",()=>{this.app.commands.executeCommandById(this.config.commandId)})}openCommandPicker(){let t=this.getAllCommands();new It(this.app,t,e=>{this.config.commandId=e.id,this.plugin.saveSettings(),this.render()}).open()}getAllCommands(){var e;let t=(e=this.app.commands)==null?void 0:e.commands;return t?Object.values(t):[]}getCommand(t){var i;let e=(i=this.app.commands)==null?void 0:i.commands;return e==null?void 0:e[t]}};var Ci=require("obsidian");var lt=class extends x{constructor(e,i,n,s){super(e,i,n,s);this.searchTimer=null;this.hiddenFilter=Ve(this.app),this.render()}render(){this.bodyEl.empty(),this.bodyEl.addClass("iris-hp-switcher-body");let e=this.bodyEl.createDiv({cls:"iris-hp-switcher-input-row"}),i=e.createDiv({cls:"iris-hp-switcher-icon"});(0,Ci.setIcon)(i,"search");let n=e.createEl("input",{cls:"iris-hp-switcher-input",attr:{type:"text",placeholder:"Jump to note..."}}),s=this.bodyEl.createDiv({cls:"iris-hp-switcher-results"});n.addEventListener("input",()=>{this.searchTimer&&clearTimeout(this.searchTimer),this.searchTimer=setTimeout(()=>{this.updateResults(n.value.trim(),s)},120)}),n.addEventListener("keydown",o=>{if(o.key==="Enter"){let a=s.querySelector(".iris-hp-switcher-item");a==null||a.click()}})}updateResults(e,i){if(i.empty(),!e)return;let n=e.toLowerCase(),s=this.app.vault.getMarkdownFiles().filter(o=>!this.hiddenFilter(o.path)&&o.basename.toLowerCase().includes(n)).sort((o,a)=>{let l=o.basename.toLowerCase().startsWith(n)?0:1,c=a.basename.toLowerCase().startsWith(n)?0:1;return l-c||o.basename.localeCompare(a.basename)}).slice(0,20);for(let o of s){let a=i.createDiv({cls:"iris-hp-switcher-item"});a.createSpan({text:Ge(this.app,o)}),a.addEventListener("click",()=>{this.app.workspace.getLeaf(!1).openFile(o)})}}destroy(){this.searchTimer&&clearTimeout(this.searchTimer),super.destroy()}};var Oi=require("obsidian");var ct=class extends x{constructor(e,i,n,s){super(e,i,n,s);this.embeddedView=null;this.resizeObserver=null;this.render()}render(){if(this.embeddedView){if(this.embeddedView.getViewType()===this.config.type){this.bodyEl.contains(this.embeddedView.containerEl)||(this.bodyEl.empty(),this.bodyEl.addClass("iris-hp-view-embed-body"),this.bodyEl.appendChild(this.embeddedView.containerEl));return}this.cleanupView()}this.bodyEl.empty(),this.bodyEl.addClass("iris-hp-view-embed-body");let e=this.bodyEl.createDiv({cls:"iris-hp-view-embed-loading",text:"Loading..."});this.embedView().then(i=>{i?e.remove():e.setText("Failed to load view")})}async embedView(){var o;let e=this.app.viewRegistry;if(!e)return!1;let i=e.viewByType instanceof Map?e.viewByType.get(this.config.type):(o=e.viewByType)==null?void 0:o[this.config.type];if(!i)return!1;let n=new Oi.WorkspaceLeaf(this.app),s=i(n);return n.view=s,this.embeddedView=s,this.bodyEl.appendChild(s.containerEl),s.containerEl.addClass("iris-hp-embedded-leaf"),s.onOpen&&await s.onOpen(),this.resizeObserver=new ResizeObserver(()=>{this.triggerResize(s)}),this.resizeObserver.observe(this.bodyEl),!0}triggerResize(e){let i=e;typeof i.onResize=="function"&&i.onResize(),i.renderer&&(typeof i.renderer.onResize=="function"&&i.renderer.onResize(),typeof i.renderer.start=="function"&&!i.renderer._running&&i.renderer.start(),typeof i.renderer.render=="function"&&i.renderer.render())}cleanupView(){if(this.resizeObserver&&(this.resizeObserver.disconnect(),this.resizeObserver=null),this.embeddedView){try{this.embeddedView.onClose&&this.embeddedView.onClose()}catch(e){}this.embeddedView.containerEl.remove(),this.embeddedView=null}}destroy(){this.cleanupView(),super.destroy()}};var pt=require("obsidian");var dt=class extends pt.Modal{constructor(){super(...arguments);this.resolve=null;this.entries=[];this.filteredEntries=[];this.gridEl=null}open(){return this.entries=this.buildEntries(),this.filteredEntries=this.entries,super.open(),new Promise(e=>{this.resolve=e})}onOpen(){let{contentEl:e,modalEl:i}=this;i.addClass("iris-hp-picker-modal"),e.empty(),e.createEl("h2",{cls:"iris-hp-picker-title",text:"Add Widget"});let n=e.createEl("input",{cls:"iris-hp-picker-search",attr:{type:"text",placeholder:"Search views..."}});n.addEventListener("input",()=>{let s=n.value.toLowerCase().trim();this.filteredEntries=s?this.entries.filter(o=>o.label.toLowerCase().includes(s)||o.type.toLowerCase().includes(s)):this.entries,this.renderGrid()}),this.gridEl=e.createDiv({cls:"iris-hp-picker-grid"}),this.renderGrid(),n.focus()}onClose(){this.resolve&&(this.resolve(null),this.resolve=null)}renderGrid(){if(!this.gridEl)return;this.gridEl.empty();let e=[{label:"Home",entries:this.filteredEntries.filter(i=>i.group==="homepage")},{label:"Core",entries:this.filteredEntries.filter(i=>i.group==="core")},{label:"Plugins",entries:this.filteredEntries.filter(i=>i.group==="plugin")}];for(let i of e){if(i.entries.length===0)continue;this.gridEl.createEl("h3",{cls:"iris-hp-picker-group-label",text:i.label});let n=this.gridEl.createDiv({cls:"iris-hp-picker-section"});for(let s of i.entries){let o=n.createDiv({cls:"iris-hp-picker-card"}),a=o.createDiv({cls:"iris-hp-picker-card-icon"});(0,pt.setIcon)(a,s.icon),o.createDiv({cls:"iris-hp-picker-card-label",text:s.label}),o.addEventListener("click",()=>{this.resolve&&(this.resolve({type:s.type,width:s.width,height:s.height}),this.resolve=null),this.close()})}}this.filteredEntries.length===0&&this.gridEl.createDiv({cls:"iris-hp-picker-empty",text:"No matching views"})}buildEntries(){let e=[];for(let[n,s]of Object.entries(de))e.push({type:n,label:s.label,icon:s.icon,group:"homepage",width:s.width,height:s.height});let i=this.app.viewRegistry;if(i&&i.viewByType){let n=i.viewByType instanceof Map?i.viewByType:new Map(Object.entries(i.viewByType));for(let s of n.keys())$t.has(s)||Object.prototype.hasOwnProperty.call(de,s)||e.push({type:s,label:yt(s),icon:Lt[s]||"box",group:Ft.has(s)?"core":"plugin",width:2,height:3})}return e}};var Si=new Image;Si.src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";var mt=class extends Q.ItemView{constructor(e,i){super(e);this.widgetInstances=new Map;this.editMode=!1;this.draggedWidgetId=null;this.dragOffsetCol=0;this.dragOffsetRow=0;this.gridEl=null;this.ghostEl=null;this.plugin=i,this.engine=new Be(i.settings.columns)}getViewType(){return I}getDisplayText(){return"Home"}getIcon(){return"home"}async onOpen(){this.render()}async onClose(){this.widgetInstances.forEach(e=>e.destroy()),this.widgetInstances.clear()}render(){this.engine.setColumns(this.plugin.settings.columns),this.widgetInstances.forEach(n=>n.destroy()),this.widgetInstances.clear();let e=this.contentEl;e.empty(),e.addClass("iris-hp-root"),e.toggleClass("iris-hp-edit-mode",this.editMode),e.toggleClass("iris-hp-borderless",this.plugin.settings.borderless);let i=e.createDiv({cls:"iris-hp-grid"});this.gridEl=i,i.style.gridTemplateColumns=`repeat(${this.plugin.settings.columns}, 1fr)`,i.style.gridAutoRows=`${60}px`,i.style.gap=`${12}px`;for(let n of this.plugin.settings.widgets)this.renderWidget(i,n);if(this.plugin.settings.widgets.length===0){let n=e.createDiv({cls:"iris-hp-empty-state"}),s=n.createDiv({cls:"iris-hp-empty-state-icon"});(0,Q.setIcon)(s,"pencil"),n.createEl("span",{text:"Click the pencil to get started"})}if(this.editMode){let n=this.plugin.settings.columns,s=this.engine.getMaxRow(this.plugin.settings.widgets),o=getComputedStyle(this.contentEl),a=parseFloat(o.paddingTop)+parseFloat(o.paddingBottom),l=Math.floor((this.contentEl.clientHeight-a)/72),c=Math.max(s+2,l);for(let d=0;d<c;d++)for(let m=0;m<n;m++){let g=i.createDiv({cls:"iris-hp-grid-dot"});g.style.gridColumn=`${m+1}`,g.style.gridRow=`${d+1}`}}this.attachGridListeners(i),this.renderToolbar(e)}renderToolbar(e){let i=e.createDiv({cls:"iris-hp-toolbar"}),n=i.createEl("button",{cls:"iris-hp-toolbar-btn clickable-icon",attr:{"aria-label":this.editMode?"Done editing":"Edit layout"}});if((0,Q.setIcon)(n,this.editMode?"check":"pencil"),n.addEventListener("click",()=>{this.editMode=!this.editMode,this.render()}),this.editMode){let s=i.createEl("button",{cls:"iris-hp-toolbar-btn clickable-icon",attr:{"aria-label":"Add widget"}});(0,Q.setIcon)(s,"plus"),s.addEventListener("click",()=>this.openPicker());let o=e.createDiv({cls:"iris-hp-trash-zone"});(0,Q.setIcon)(o,"trash-2"),o.addEventListener("dragover",a=>{a.preventDefault(),a.dataTransfer&&(a.dataTransfer.dropEffect="move"),o.addClass("iris-hp-trash-hover")}),o.addEventListener("dragleave",()=>{o.removeClass("iris-hp-trash-hover")}),o.addEventListener("drop",a=>{if(a.preventDefault(),o.removeClass("iris-hp-trash-hover"),!this.draggedWidgetId||!this.gridEl)return;let l=this.draggedWidgetId,c=this.gridEl;this.draggedWidgetId=null;let d=()=>{let g=this.plugin.settings.widgets.findIndex(C=>C.id===l);if(g===-1)return;let w=this.snapshotPositions(c);this.plugin.settings.widgets.splice(g,1),this.engine.compact(this.plugin.settings.widgets),this.animateReflow(c,w),this.plugin.saveData(this.plugin.settings)},m=c.querySelector(`.iris-hp-widget-wrapper[data-widget-id="${l}"]`);if(m){let g=m.getBoundingClientRect(),w=o.getBoundingClientRect(),C=w.left+w.width/2-(g.left+g.width/2),ce=w.top+w.height/2-(g.top+g.height/2);m.style.transition="transform 0.25s ease, opacity 0.25s ease",m.style.transform=`translate(${C}px, ${ce}px) scale(0.1)`,m.style.opacity="0",m.style.zIndex="200";let N=!1,k=()=>{N||(N=!0,m.remove(),d())};m.addEventListener("transitionend",k,{once:!0}),setTimeout(k,350)}else d()})}}async openPicker(){let i=await new dt(this.app).open();i&&this.addWidget(i)}renderWidget(e,i){let n=e.createDiv({cls:"iris-hp-widget-wrapper"});n.dataset.widgetId=i.id,n.setAttribute("draggable","true"),this.setGridPos(n,i.col,i.row,i.width,i.height);let s;if(Ht(i.type))switch(i.type){case"recent-notes":s=new je(this.app,n,i,this.plugin);break;case"embedded-note":s=new Ke(this.app,n,i,this.plugin);break;case"new-note":s=new qe(this.app,n,i,this.plugin);break;case"create-task":s=new ot(this.app,n,i,this.plugin);break;case"command":s=new at(this.app,n,i,this.plugin);break;case"quick-switcher":s=new lt(this.app,n,i,this.plugin);break}else s=new ct(this.app,n,i,this.plugin);this.widgetInstances.set(i.id,s)}addWidget(e){let{width:i,height:n}=e,s=this.engine.findFirstAvailable(this.plugin.settings.widgets,i,n),o={id:crypto.randomUUID(),type:e.type,col:s.col,row:s.row,width:i,height:n};this.plugin.settings.widgets.push(o),this.engine.compact(this.plugin.settings.widgets),this.plugin.saveSettings()}attachGridListeners(e){e.addEventListener("dragstart",i=>{if(!this.editMode){i.preventDefault();return}let n=i.target.closest(".iris-hp-widget-wrapper");if(n&&(this.draggedWidgetId=n.dataset.widgetId||null,this.draggedWidgetId&&i.dataTransfer)){let s=this.plugin.settings.widgets.find(a=>a.id===this.draggedWidgetId),o=this.getCellFromEvent(e,i);s&&o?(this.dragOffsetCol=o.col-s.col,this.dragOffsetRow=o.row-s.row):(this.dragOffsetCol=0,this.dragOffsetRow=0),i.dataTransfer.setData("text/plain",this.draggedWidgetId),i.dataTransfer.effectAllowed="move",i.dataTransfer.setDragImage(Si,0,0),n.addClass("iris-hp-dragging")}}),e.addEventListener("dragover",i=>{!this.editMode||!this.draggedWidgetId||(i.preventDefault(),i.dataTransfer&&(i.dataTransfer.dropEffect="move"),this.updateGhost(e,i))}),e.addEventListener("dragleave",()=>{this.removeGhost()}),e.addEventListener("drop",i=>{if(i.preventDefault(),this.removeGhost(),!this.draggedWidgetId)return;let n=this.getCellFromEvent(e,i);if(!n)return;let s=this.plugin.settings.widgets.find(a=>a.id===this.draggedWidgetId);if(!s)return;let o=this.snapshotPositions(e);s.col=Math.max(0,Math.min(n.col-this.dragOffsetCol,this.plugin.settings.columns-s.width)),s.row=Math.max(0,n.row-this.dragOffsetRow),this.engine.clamp(s),this.engine.resolveCollisions(this.plugin.settings.widgets,s),this.draggedWidgetId=null,this.animateReflow(e,o),this.plugin.saveData(this.plugin.settings)}),e.addEventListener("dragend",()=>{this.draggedWidgetId=null,this.removeGhost(),e.querySelectorAll(".iris-hp-dragging").forEach(i=>i.removeClass("iris-hp-dragging"))}),e.addEventListener("widget-resize-start",i=>{if(!this.editMode)return;let{widgetId:n,corner:s,event:o}=i.detail;this.startResize(e,n,s,o)})}startResize(e,i,n,s){let o=this.plugin.settings.widgets.find(O=>O.id===i);if(!o)return;let a=e.getBoundingClientRect(),{cellW:l,cellH:c}=this.getCellSize(a),d=l+12,m=c+12,g=o.col,w=o.row,C=o.width,ce=o.height,N=g+C,k=w+ce,gt=e.createDiv({cls:"iris-hp-resize-ghost"});this.setGridPos(gt,o.col,o.row,o.width,o.height);let Ni=O=>({col:Math.floor((O.clientX-a.left)/d),row:Math.floor((O.clientY-a.top)/m)}),kt=O=>{let T=Ni(O),S=g,K=w,W=C,q=ce;switch(n){case"br":W=Math.max(1,T.col-g+1),q=Math.max(1,T.row-w+1);break;case"bl":S=Math.max(0,Math.min(T.col,N-1)),W=N-S,q=Math.max(1,T.row-w+1);break;case"tr":W=Math.max(1,T.col-g+1),K=Math.max(0,Math.min(T.row,k-1)),q=k-K;break;case"tl":S=Math.max(0,Math.min(T.col,N-1)),W=N-S,K=Math.max(0,Math.min(T.row,k-1)),q=k-K;break;case"r":W=Math.max(1,T.col-g+1);break;case"l":S=Math.max(0,Math.min(T.col,N-1)),W=N-S;break;case"b":q=Math.max(1,T.row-w+1);break;case"t":K=Math.max(0,Math.min(T.row,k-1)),q=k-K;break}return W=Math.min(W,this.plugin.settings.columns-S),{col:S,row:K,w:W,h:q}},Wt=O=>{let T=kt(O);this.setGridPos(gt,T.col,T.row,T.w,T.h)},_t=O=>{document.removeEventListener("mousemove",Wt),document.removeEventListener("mouseup",_t),gt.remove();let T=kt(O);if(o.col=T.col,o.row=T.row,o.width=T.w,o.height=T.h,o.width!==C||o.height!==ce||o.col!==g||o.row!==w){let S=this.snapshotPositions(e);this.engine.resolveCollisions(this.plugin.settings.widgets,o),this.animateReflow(e,S),this.plugin.saveData(this.plugin.settings)}};document.addEventListener("mousemove",Wt),document.addEventListener("mouseup",_t)}updateGhost(e,i){let n=this.getCellFromEvent(e,i);if(!n)return;let s=this.plugin.settings.widgets.find(l=>l.id===this.draggedWidgetId);if(!s)return;this.ghostEl||(this.ghostEl=e.createDiv({cls:"iris-hp-drop-ghost"}));let o=Math.max(0,Math.min(n.col-this.dragOffsetCol,this.plugin.settings.columns-s.width)),a=Math.max(0,n.row-this.dragOffsetRow);this.setGridPos(this.ghostEl,o,a,s.width,s.height)}setGridPos(e,i,n,s,o){e.style.gridColumn=`${i+1} / span ${s}`,e.style.gridRow=`${n+1} / span ${o}`}removeGhost(){this.ghostEl&&(this.ghostEl.remove(),this.ghostEl=null)}getCellSize(e){return{cellW:(e.width-12*(this.plugin.settings.columns-1))/this.plugin.settings.columns,cellH:60}}getCellFromEvent(e,i){let n=e.getBoundingClientRect(),{cellW:s,cellH:o}=this.getCellSize(n),a=i.clientX-n.left,l=i.clientY-n.top;return this.engine.pixelToCell(a,l,s+12,o+12)}snapshotPositions(e){let i=new Map;return e.querySelectorAll(".iris-hp-widget-wrapper").forEach(n=>{let s=n.dataset.widgetId;s&&i.set(s,n.getBoundingClientRect())}),i}animateReflow(e,i){for(let n of this.plugin.settings.widgets){let s=e.querySelector(`.iris-hp-widget-wrapper[data-widget-id="${n.id}"]`);s&&this.setGridPos(s,n.col,n.row,n.width,n.height)}e.offsetHeight,e.querySelectorAll(".iris-hp-widget-wrapper").forEach(n=>{let s=n.dataset.widgetId;if(!s)return;let o=i.get(s);if(!o)return;let a=n.getBoundingClientRect(),l=o.left-a.left,c=o.top-a.top;Math.abs(l)<1&&Math.abs(c)<1||(n.style.transition="none",n.style.transform=`translate(${l}px, ${c}px)`,requestAnimationFrame(()=>{n.style.transition="transform 0.25s ease",n.style.transform=""}))})}};var R=require("obsidian");var ht=class extends R.PluginSettingTab{constructor(t,e){super(t,e),this.plugin=e}display(){var n,s,o;let{containerEl:t}=this;t.empty(),t.createEl("h2",{text:"General"}),new R.Setting(t).setName("Grid columns").setDesc("Number of columns in the widget grid (2-16)").addDropdown(a=>{for(let l=2;l<=16;l++)a.addOption(String(l*2),String(l));a.setValue(String(this.plugin.settings.columns)),a.onChange(async l=>{this.plugin.settings.columns=parseInt(l,10),await this.plugin.saveSettings()})}),new R.Setting(t).setName("Open on startup").setDesc("Show the homepage when Obsidian starts").addToggle(a=>a.setValue(this.plugin.settings.openOnStartup).onChange(async l=>{this.plugin.settings.openOnStartup=l,await this.plugin.saveSettings()})),new R.Setting(t).setName("Replace new tabs").setDesc("Open the homepage instead of an empty new tab").addToggle(a=>a.setValue(this.plugin.settings.replaceNewTab).onChange(async l=>{this.plugin.settings.replaceNewTab=l,await this.plugin.saveSettings()})),new R.Setting(t).setName("Borderless widgets").setDesc("Remove borders and backgrounds from widget cards").addToggle(a=>a.setValue(this.plugin.settings.borderless).onChange(async l=>{this.plugin.settings.borderless=l,await this.plugin.saveSettings()})),t.createEl("h2",{text:"AI"});let e=new R.Setting(t).setName("Anthropic API key").setDesc("Used as a fallback for natural language date parsing when chrono-node can't interpret the input"),i=ze(this.app);e.addText(a=>{a.setPlaceholder(i?"\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022":"sk-ant-\u2026").onChange(()=>{});let l=a.inputEl;l.type="password",l.style.width="220px",e.addButton(c=>c.setButtonText("Save").onClick(async()=>{let d=l.value.trim();d&&(wt(this.app,d),l.value="",l.placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022")})),i&&e.addButton(c=>c.setButtonText("Clear").setWarning().onClick(async()=>{wt(this.app,""),l.placeholder="sk-ant-\u2026",l.value=""}))}),t.createEl("h2",{text:"Widgets"});for(let a=0;a<this.plugin.settings.widgets.length;a++){let l=this.plugin.settings.widgets[a],c=Ut(l.type);if(new R.Setting(t).setName(c).setDesc(`Position: col ${l.col+1}, row ${l.row+1} | Size: ${l.width}x${l.height}`).addButton(d=>d.setButtonText("Remove").setWarning().onClick(async()=>{this.plugin.settings.widgets.splice(a,1),await this.plugin.saveSettings(),this.display()})),l.type==="command"&&l.commandId){let d=(s=(n=this.app.commands)==null?void 0:n.commands)==null?void 0:s[l.commandId];new R.Setting(t).setClass("iris-hp-setting-indent").setName("Command").setDesc((o=d==null?void 0:d.name)!=null?o:l.commandId)}l.type==="embedded-note"&&new R.Setting(t).setClass("iris-hp-setting-indent").setName("Note path").setDesc("Path to the note to embed").addText(d=>{var m;return d.setPlaceholder("path/to/note.md").setValue((m=l.notePath)!=null?m:"").onChange(async g=>{l.notePath=g.trim(),await this.plugin.saveSettings()})})}}};var ft=class extends Ii.Plugin{constructor(){super(...arguments);this.settings=ut;this.isReplacingTab=!1;this.hideEmptyStyleEl=null}async onload(){await this.loadSettings(),this.registerView(I,e=>new mt(e,this)),this.addCommand({id:"open-homepage",name:"Open home",callback:()=>this.activateView()}),this.addSettingTab(new ht(this.app,this)),this.updateEmptyTabVisibility(),this.app.workspace.onLayoutReady(()=>{this.settings.openOnStartup&&this.replaceEmptyTabs()}),this.registerEvent(this.app.workspace.on("layout-change",()=>{this.settings.replaceNewTab&&this.replaceEmptyTabs()}))}async onunload(){this.hideEmptyStyleEl&&(this.hideEmptyStyleEl.remove(),this.hideEmptyStyleEl=null),this.app.workspace.detachLeavesOfType(I)}async loadSettings(){let e=await this.loadData();if(this.settings=Object.assign({},ut,e),!this.settings.gridVersion||this.settings.gridVersion<2){for(let i of this.settings.widgets)i.height*=2,i.row*=2;this.settings.gridVersion=2}if(this.settings.gridVersion<3){this.settings.columns*=2;for(let i of this.settings.widgets)i.width*=2,i.col*=2;this.settings.gridVersion=3}(!(e!=null&&e.gridVersion)||e.gridVersion<3)&&await this.saveData(this.settings)}async saveSettings(){await this.saveData(this.settings),this.updateEmptyTabVisibility(),this.refreshViews()}refreshViews(){for(let e of this.app.workspace.getLeavesOfType(I))e.view.render()}async activateView(){let e=this.app.workspace.getLeavesOfType(I);if(e.length>0){this.app.workspace.revealLeaf(e[0]);return}let i=this.app.workspace.getLeaf(!0);await i.setViewState({type:I,active:!0}),this.app.workspace.revealLeaf(i)}updateEmptyTabVisibility(){this.settings.replaceNewTab&&!this.hideEmptyStyleEl?(this.hideEmptyStyleEl=document.createElement("style"),this.hideEmptyStyleEl.textContent='.workspace-leaf-content[data-type="empty"] { display: none !important; }',document.head.appendChild(this.hideEmptyStyleEl)):!this.settings.replaceNewTab&&this.hideEmptyStyleEl&&(this.hideEmptyStyleEl.remove(),this.hideEmptyStyleEl=null)}replaceEmptyTabs(){if(!this.isReplacingTab){this.isReplacingTab=!0;try{let e=this.app.workspace.getLeavesOfType("empty");for(let i of e)i.setViewState({type:I,active:!0})}finally{this.isReplacingTab=!1}}}};
+            reference: ${JSON.stringify(this.reference)}]`;
+  }
+  date() {
+    const date = this.dateWithoutTimezoneAdjustment();
+    const timezoneAdjustment = this.reference.getSystemTimezoneAdjustmentMinute(date, this.get("timezoneOffset"));
+    return new Date(date.getTime() + timezoneAdjustment * 6e4);
+  }
+  addTag(tag) {
+    this._tags.add(tag);
+    return this;
+  }
+  addTags(tags) {
+    for (const tag of tags) {
+      this._tags.add(tag);
+    }
+    return this;
+  }
+  tags() {
+    return new Set(this._tags);
+  }
+  dateWithoutTimezoneAdjustment() {
+    const date = new Date(this.get("year"), this.get("month") - 1, this.get("day"), this.get("hour"), this.get("minute"), this.get("second"), this.get("millisecond"));
+    date.setFullYear(this.get("year"));
+    return date;
+  }
+};
+var ParsingResult = class _ParsingResult {
+  refDate;
+  index;
+  text;
+  reference;
+  start;
+  end;
+  constructor(reference, index, text, start, end) {
+    this.reference = reference;
+    this.refDate = reference.instant;
+    this.index = index;
+    this.text = text;
+    this.start = start || new ParsingComponents(reference);
+    this.end = end;
+  }
+  clone() {
+    const result = new _ParsingResult(this.reference, this.index, this.text);
+    result.start = this.start ? this.start.clone() : null;
+    result.end = this.end ? this.end.clone() : null;
+    return result;
+  }
+  date() {
+    return this.start.date();
+  }
+  addTag(tag) {
+    this.start.addTag(tag);
+    if (this.end) {
+      this.end.addTag(tag);
+    }
+    return this;
+  }
+  addTags(tags) {
+    this.start.addTags(tags);
+    if (this.end) {
+      this.end.addTags(tags);
+    }
+    return this;
+  }
+  tags() {
+    const combinedTags = new Set(this.start.tags());
+    if (this.end) {
+      for (const tag of this.end.tags()) {
+        combinedTags.add(tag);
+      }
+    }
+    return combinedTags;
+  }
+  toString() {
+    const tags = Array.from(this.tags()).sort();
+    return `[ParsingResult {index: ${this.index}, text: '${this.text}', tags: ${JSON.stringify(tags)} ...}]`;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/utils/pattern.js
+function repeatedTimeunitPattern(prefix, singleTimeunitPattern, connectorPattern = "\\s{0,5},?\\s{0,5}") {
+  const singleTimeunitPatternNoCapture = singleTimeunitPattern.replace(/\((?!\?)/g, "(?:");
+  return `${prefix}${singleTimeunitPatternNoCapture}(?:${connectorPattern}${singleTimeunitPatternNoCapture}){0,10}`;
+}
+function extractTerms(dictionary) {
+  let keys;
+  if (dictionary instanceof Array) {
+    keys = [...dictionary];
+  } else if (dictionary instanceof Map) {
+    keys = Array.from(dictionary.keys());
+  } else {
+    keys = Object.keys(dictionary);
+  }
+  return keys;
+}
+function matchAnyPattern(dictionary) {
+  const joinedTerms = extractTerms(dictionary).sort((a, b) => b.length - a.length).join("|").replace(/\./g, "\\.");
+  return `(?:${joinedTerms})`;
+}
+
+// node_modules/chrono-node/dist/esm/calculation/years.js
+function findMostLikelyADYear(yearNumber) {
+  if (yearNumber < 100) {
+    if (yearNumber > 50) {
+      yearNumber = yearNumber + 1900;
+    } else {
+      yearNumber = yearNumber + 2e3;
+    }
+  }
+  return yearNumber;
+}
+function findYearClosestToRef(refDate, day, month) {
+  let date = new Date(refDate);
+  date.setMonth(month - 1);
+  date.setDate(day);
+  const nextYear = addDuration(date, { "year": 1 });
+  const lastYear = addDuration(date, { "year": -1 });
+  if (Math.abs(nextYear.getTime() - refDate.getTime()) < Math.abs(date.getTime() - refDate.getTime())) {
+    date = nextYear;
+  } else if (Math.abs(lastYear.getTime() - refDate.getTime()) < Math.abs(date.getTime() - refDate.getTime())) {
+    date = lastYear;
+  }
+  return date.getFullYear();
+}
+
+// node_modules/chrono-node/dist/esm/locales/en/constants.js
+var WEEKDAY_DICTIONARY = {
+  sunday: 0,
+  sun: 0,
+  "sun.": 0,
+  monday: 1,
+  mon: 1,
+  "mon.": 1,
+  tuesday: 2,
+  tue: 2,
+  "tue.": 2,
+  wednesday: 3,
+  wed: 3,
+  "wed.": 3,
+  thursday: 4,
+  thurs: 4,
+  "thurs.": 4,
+  thur: 4,
+  "thur.": 4,
+  thu: 4,
+  "thu.": 4,
+  friday: 5,
+  fri: 5,
+  "fri.": 5,
+  saturday: 6,
+  sat: 6,
+  "sat.": 6
+};
+var FULL_MONTH_NAME_DICTIONARY = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12
+};
+var MONTH_DICTIONARY = {
+  ...FULL_MONTH_NAME_DICTIONARY,
+  jan: 1,
+  "jan.": 1,
+  feb: 2,
+  "feb.": 2,
+  mar: 3,
+  "mar.": 3,
+  apr: 4,
+  "apr.": 4,
+  jun: 6,
+  "jun.": 6,
+  jul: 7,
+  "jul.": 7,
+  aug: 8,
+  "aug.": 8,
+  sep: 9,
+  "sep.": 9,
+  sept: 9,
+  "sept.": 9,
+  oct: 10,
+  "oct.": 10,
+  nov: 11,
+  "nov.": 11,
+  dec: 12,
+  "dec.": 12
+};
+var INTEGER_WORD_DICTIONARY = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12
+};
+var ORDINAL_WORD_DICTIONARY = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10,
+  eleventh: 11,
+  twelfth: 12,
+  thirteenth: 13,
+  fourteenth: 14,
+  fifteenth: 15,
+  sixteenth: 16,
+  seventeenth: 17,
+  eighteenth: 18,
+  nineteenth: 19,
+  twentieth: 20,
+  "twenty first": 21,
+  "twenty-first": 21,
+  "twenty second": 22,
+  "twenty-second": 22,
+  "twenty third": 23,
+  "twenty-third": 23,
+  "twenty fourth": 24,
+  "twenty-fourth": 24,
+  "twenty fifth": 25,
+  "twenty-fifth": 25,
+  "twenty sixth": 26,
+  "twenty-sixth": 26,
+  "twenty seventh": 27,
+  "twenty-seventh": 27,
+  "twenty eighth": 28,
+  "twenty-eighth": 28,
+  "twenty ninth": 29,
+  "twenty-ninth": 29,
+  "thirtieth": 30,
+  "thirty first": 31,
+  "thirty-first": 31
+};
+var TIME_UNIT_DICTIONARY_NO_ABBR = {
+  second: "second",
+  seconds: "second",
+  minute: "minute",
+  minutes: "minute",
+  hour: "hour",
+  hours: "hour",
+  day: "day",
+  days: "day",
+  week: "week",
+  weeks: "week",
+  month: "month",
+  months: "month",
+  quarter: "quarter",
+  quarters: "quarter",
+  year: "year",
+  years: "year"
+};
+var TIME_UNIT_DICTIONARY = {
+  s: "second",
+  sec: "second",
+  second: "second",
+  seconds: "second",
+  m: "minute",
+  min: "minute",
+  mins: "minute",
+  minute: "minute",
+  minutes: "minute",
+  h: "hour",
+  hr: "hour",
+  hrs: "hour",
+  hour: "hour",
+  hours: "hour",
+  d: "day",
+  day: "day",
+  days: "day",
+  w: "week",
+  week: "week",
+  weeks: "week",
+  mo: "month",
+  mon: "month",
+  mos: "month",
+  month: "month",
+  months: "month",
+  qtr: "quarter",
+  quarter: "quarter",
+  quarters: "quarter",
+  y: "year",
+  yr: "year",
+  year: "year",
+  years: "year",
+  ...TIME_UNIT_DICTIONARY_NO_ABBR
+};
+var NUMBER_PATTERN = `(?:${matchAnyPattern(INTEGER_WORD_DICTIONARY)}|[0-9]+|[0-9]+\\.[0-9]+|half(?:\\s{0,2}an?)?|an?\\b(?:\\s{0,2}few)?|few|several|the|a?\\s{0,2}couple\\s{0,2}(?:of)?)`;
+function parseNumberPattern(match) {
+  const num = match.toLowerCase();
+  if (INTEGER_WORD_DICTIONARY[num] !== void 0) {
+    return INTEGER_WORD_DICTIONARY[num];
+  } else if (num === "a" || num === "an" || num == "the") {
+    return 1;
+  } else if (num.match(/few/)) {
+    return 3;
+  } else if (num.match(/half/)) {
+    return 0.5;
+  } else if (num.match(/couple/)) {
+    return 2;
+  } else if (num.match(/several/)) {
+    return 7;
+  }
+  return parseFloat(num);
+}
+var ORDINAL_NUMBER_PATTERN = `(?:${matchAnyPattern(ORDINAL_WORD_DICTIONARY)}|[0-9]{1,2}(?:st|nd|rd|th)?)`;
+function parseOrdinalNumberPattern(match) {
+  let num = match.toLowerCase();
+  if (ORDINAL_WORD_DICTIONARY[num] !== void 0) {
+    return ORDINAL_WORD_DICTIONARY[num];
+  }
+  num = num.replace(/(?:st|nd|rd|th)$/i, "");
+  return parseInt(num);
+}
+var YEAR_PATTERN = `(?:[1-9][0-9]{0,3}\\s{0,2}(?:BE|AD|BC|BCE|CE)|[1-2][0-9]{3}|[5-9][0-9]|2[0-5])`;
+function parseYear(match) {
+  if (/BE/i.test(match)) {
+    match = match.replace(/BE/i, "");
+    return parseInt(match) - 543;
+  }
+  if (/BCE?/i.test(match)) {
+    match = match.replace(/BCE?/i, "");
+    return -parseInt(match);
+  }
+  if (/(AD|CE)/i.test(match)) {
+    match = match.replace(/(AD|CE)/i, "");
+    return parseInt(match);
+  }
+  const rawYearNumber = parseInt(match);
+  return findMostLikelyADYear(rawYearNumber);
+}
+var SINGLE_TIME_UNIT_PATTERN = `(${NUMBER_PATTERN})\\s{0,3}(${matchAnyPattern(TIME_UNIT_DICTIONARY)})`;
+var SINGLE_TIME_UNIT_REGEX = new RegExp(SINGLE_TIME_UNIT_PATTERN, "i");
+var SINGLE_TIME_UNIT_NO_ABBR_PATTERN = `(${NUMBER_PATTERN})\\s{0,3}(${matchAnyPattern(TIME_UNIT_DICTIONARY_NO_ABBR)})`;
+var TIME_UNIT_CONNECTOR_PATTERN = `\\s{0,5},?(?:\\s*and)?\\s{0,5}`;
+var TIME_UNITS_PATTERN = repeatedTimeunitPattern(`(?:(?:about|around)\\s{0,3})?`, SINGLE_TIME_UNIT_PATTERN, TIME_UNIT_CONNECTOR_PATTERN);
+var TIME_UNITS_NO_ABBR_PATTERN = repeatedTimeunitPattern(`(?:(?:about|around)\\s{0,3})?`, SINGLE_TIME_UNIT_NO_ABBR_PATTERN, TIME_UNIT_CONNECTOR_PATTERN);
+function parseDuration(timeunitText) {
+  const fragments = {};
+  let remainingText = timeunitText;
+  let match = SINGLE_TIME_UNIT_REGEX.exec(remainingText);
+  while (match) {
+    collectDateTimeFragment(fragments, match);
+    remainingText = remainingText.substring(match[0].length).trim();
+    match = SINGLE_TIME_UNIT_REGEX.exec(remainingText);
+  }
+  if (Object.keys(fragments).length == 0) {
+    return null;
+  }
+  return fragments;
+}
+function collectDateTimeFragment(fragments, match) {
+  if (match[0].match(/^[a-zA-Z]+$/)) {
+    return;
+  }
+  const num = parseNumberPattern(match[1]);
+  const unit = TIME_UNIT_DICTIONARY[match[2].toLowerCase()];
+  fragments[unit] = num;
+}
+
+// node_modules/chrono-node/dist/esm/common/parsers/AbstractParserWithWordBoundary.js
+var AbstractParserWithWordBoundaryChecking = class {
+  innerPatternHasChange(context, currentInnerPattern) {
+    return this.innerPattern(context) !== currentInnerPattern;
+  }
+  patternLeftBoundary() {
+    return `(\\W|^)`;
+  }
+  cachedInnerPattern = null;
+  cachedPattern = null;
+  pattern(context) {
+    if (this.cachedInnerPattern) {
+      if (!this.innerPatternHasChange(context, this.cachedInnerPattern)) {
+        return this.cachedPattern;
+      }
+    }
+    this.cachedInnerPattern = this.innerPattern(context);
+    this.cachedPattern = new RegExp(`${this.patternLeftBoundary()}${this.cachedInnerPattern.source}`, this.cachedInnerPattern.flags);
+    return this.cachedPattern;
+  }
+  extract(context, match) {
+    const header = match[1] ?? "";
+    match.index = match.index + header.length;
+    match[0] = match[0].substring(header.length);
+    for (let i = 2; i < match.length; i++) {
+      match[i - 1] = match[i];
+    }
+    return this.innerExtract(context, match);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENTimeUnitWithinFormatParser.js
+var PATTERN_WITH_OPTIONAL_PREFIX = new RegExp(`(?:(?:within|in|for)\\s*)?(?:(?:about|around|roughly|approximately|just)\\s*(?:~\\s*)?)?(${TIME_UNITS_PATTERN})(?=\\W|$)`, "i");
+var PATTERN_WITH_PREFIX = new RegExp(`(?:within|in|for)\\s*(?:(?:about|around|roughly|approximately|just)\\s*(?:~\\s*)?)?(${TIME_UNITS_PATTERN})(?=\\W|$)`, "i");
+var PATTERN_WITH_PREFIX_STRICT = new RegExp(`(?:within|in|for)\\s*(?:(?:about|around|roughly|approximately|just)\\s*(?:~\\s*)?)?(${TIME_UNITS_NO_ABBR_PATTERN})(?=\\W|$)`, "i");
+var ENTimeUnitWithinFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  strictMode;
+  constructor(strictMode) {
+    super();
+    this.strictMode = strictMode;
+  }
+  innerPattern(context) {
+    if (this.strictMode) {
+      return PATTERN_WITH_PREFIX_STRICT;
+    }
+    return context.option.forwardDate ? PATTERN_WITH_OPTIONAL_PREFIX : PATTERN_WITH_PREFIX;
+  }
+  innerExtract(context, match) {
+    if (match[0].match(/^for\s*the\s*\w+/)) {
+      return null;
+    }
+    const timeUnits = parseDuration(match[1]);
+    if (!timeUnits) {
+      return null;
+    }
+    return ParsingComponents.createRelativeFromReference(context.reference, timeUnits);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENMonthNameLittleEndianParser.js
+var PATTERN = new RegExp(`(?:on\\s{0,3})?(${ORDINAL_NUMBER_PATTERN})(?:\\s{0,3}(?:to|\\-|\\\u2013|until|through|till)?\\s{0,3}(${ORDINAL_NUMBER_PATTERN}))?(?:-|/|\\s{0,3}(?:of)?\\s{0,3})(${matchAnyPattern(MONTH_DICTIONARY)})(?:(?:-|/|,?\\s{0,3})(${YEAR_PATTERN}(?!\\w)))?(?=\\W|$)`, "i");
+var DATE_GROUP = 1;
+var DATE_TO_GROUP = 2;
+var MONTH_NAME_GROUP = 3;
+var YEAR_GROUP = 4;
+var ENMonthNameLittleEndianParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN;
+  }
+  innerExtract(context, match) {
+    const result = context.createParsingResult(match.index, match[0]);
+    const month = MONTH_DICTIONARY[match[MONTH_NAME_GROUP].toLowerCase()];
+    const day = parseOrdinalNumberPattern(match[DATE_GROUP]);
+    if (day > 31) {
+      match.index = match.index + match[DATE_GROUP].length;
+      return null;
+    }
+    result.start.assign("month", month);
+    result.start.assign("day", day);
+    if (match[YEAR_GROUP]) {
+      const yearNumber = parseYear(match[YEAR_GROUP]);
+      result.start.assign("year", yearNumber);
+    } else {
+      const year = findYearClosestToRef(context.refDate, day, month);
+      result.start.imply("year", year);
+    }
+    if (match[DATE_TO_GROUP]) {
+      const endDate = parseOrdinalNumberPattern(match[DATE_TO_GROUP]);
+      result.end = result.start.clone();
+      result.end.assign("day", endDate);
+    }
+    return result;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENMonthNameMiddleEndianParser.js
+var PATTERN2 = new RegExp(`(${matchAnyPattern(MONTH_DICTIONARY)})(?:-|/|\\s*,?\\s*)(${ORDINAL_NUMBER_PATTERN})(?!\\s*(?:am|pm))\\s*(?:(?:to|\\-)\\s*(${ORDINAL_NUMBER_PATTERN})\\s*)?(?:(?:-|/|\\s*,\\s*|\\s+)(${YEAR_PATTERN}))?(?=\\W|$)(?!\\:\\d)`, "i");
+var MONTH_NAME_GROUP2 = 1;
+var DATE_GROUP2 = 2;
+var DATE_TO_GROUP2 = 3;
+var YEAR_GROUP2 = 4;
+var ENMonthNameMiddleEndianParser = class extends AbstractParserWithWordBoundaryChecking {
+  shouldSkipYearLikeDate;
+  constructor(shouldSkipYearLikeDate) {
+    super();
+    this.shouldSkipYearLikeDate = shouldSkipYearLikeDate;
+  }
+  innerPattern() {
+    return PATTERN2;
+  }
+  innerExtract(context, match) {
+    const month = MONTH_DICTIONARY[match[MONTH_NAME_GROUP2].toLowerCase()];
+    const day = parseOrdinalNumberPattern(match[DATE_GROUP2]);
+    if (day > 31) {
+      return null;
+    }
+    if (this.shouldSkipYearLikeDate) {
+      if (!match[DATE_TO_GROUP2] && !match[YEAR_GROUP2] && match[DATE_GROUP2].match(/^2[0-5]$/)) {
+        return null;
+      }
+    }
+    const components = context.createParsingComponents({
+      day,
+      month
+    }).addTag("parser/ENMonthNameMiddleEndianParser");
+    if (match[YEAR_GROUP2]) {
+      const year = parseYear(match[YEAR_GROUP2]);
+      components.assign("year", year);
+    } else {
+      const year = findYearClosestToRef(context.refDate, day, month);
+      components.imply("year", year);
+    }
+    if (!match[DATE_TO_GROUP2]) {
+      return components;
+    }
+    const endDate = parseOrdinalNumberPattern(match[DATE_TO_GROUP2]);
+    const result = context.createParsingResult(match.index, match[0]);
+    result.start = components;
+    result.end = components.clone();
+    result.end.assign("day", endDate);
+    return result;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENMonthNameParser.js
+var PATTERN3 = new RegExp(`((?:in)\\s*)?(${matchAnyPattern(MONTH_DICTIONARY)})\\s*(?:(?:,|-|of)?\\s*(${YEAR_PATTERN})?)?(?=[^\\s\\w]|\\s+[^0-9]|\\s+$|$)`, "i");
+var PREFIX_GROUP = 1;
+var MONTH_NAME_GROUP3 = 2;
+var YEAR_GROUP3 = 3;
+var ENMonthNameParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN3;
+  }
+  innerExtract(context, match) {
+    const monthName = match[MONTH_NAME_GROUP3].toLowerCase();
+    if (match[0].length <= 3 && !FULL_MONTH_NAME_DICTIONARY[monthName]) {
+      return null;
+    }
+    const result = context.createParsingResult(match.index + (match[PREFIX_GROUP] || "").length, match.index + match[0].length);
+    result.start.imply("day", 1);
+    result.start.addTag("parser/ENMonthNameParser");
+    const month = MONTH_DICTIONARY[monthName];
+    result.start.assign("month", month);
+    if (match[YEAR_GROUP3]) {
+      const year = parseYear(match[YEAR_GROUP3]);
+      result.start.assign("year", year);
+    } else {
+      const year = findYearClosestToRef(context.refDate, 1, month);
+      result.start.imply("year", year);
+    }
+    return result;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENYearMonthDayParser.js
+var PATTERN4 = new RegExp(`([0-9]{4})[-\\.\\/\\s](?:(${matchAnyPattern(MONTH_DICTIONARY)})|([0-9]{1,2}))[-\\.\\/\\s]([0-9]{1,2})(?=\\W|$)`, "i");
+var YEAR_NUMBER_GROUP = 1;
+var MONTH_NAME_GROUP4 = 2;
+var MONTH_NUMBER_GROUP = 3;
+var DATE_NUMBER_GROUP = 4;
+var ENYearMonthDayParser = class extends AbstractParserWithWordBoundaryChecking {
+  strictMonthDateOrder;
+  constructor(strictMonthDateOrder) {
+    super();
+    this.strictMonthDateOrder = strictMonthDateOrder;
+  }
+  innerPattern() {
+    return PATTERN4;
+  }
+  innerExtract(context, match) {
+    const year = parseInt(match[YEAR_NUMBER_GROUP]);
+    let day = parseInt(match[DATE_NUMBER_GROUP]);
+    let month = match[MONTH_NUMBER_GROUP] ? parseInt(match[MONTH_NUMBER_GROUP]) : MONTH_DICTIONARY[match[MONTH_NAME_GROUP4].toLowerCase()];
+    if (month < 1 || month > 12) {
+      if (this.strictMonthDateOrder) {
+        return null;
+      }
+      if (day >= 1 && day <= 12) {
+        [month, day] = [day, month];
+      }
+    }
+    if (day < 1 || day > 31) {
+      return null;
+    }
+    return {
+      day,
+      month,
+      year
+    };
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENSlashMonthFormatParser.js
+var PATTERN5 = new RegExp("([0-9]|0[1-9]|1[012])/([0-9]{4})", "i");
+var MONTH_GROUP = 1;
+var YEAR_GROUP4 = 2;
+var ENSlashMonthFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN5;
+  }
+  innerExtract(context, match) {
+    const year = parseInt(match[YEAR_GROUP4]);
+    const month = parseInt(match[MONTH_GROUP]);
+    return context.createParsingComponents().imply("day", 1).assign("month", month).assign("year", year);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/parsers/AbstractTimeExpressionParser.js
+function primaryTimePattern(leftBoundary, primaryPrefix, primarySuffix, flags) {
+  return new RegExp(`${leftBoundary}${primaryPrefix}(\\d{1,4})(?:(?:\\.|:|\uFF1A)(\\d{1,2})(?:(?::|\uFF1A)(\\d{2})(?:\\.(\\d{1,6}))?)?)?(?:\\s*(a\\.m\\.|p\\.m\\.|am?|pm?))?${primarySuffix}`, flags);
+}
+function followingTimePatten(followingPhase, followingSuffix) {
+  return new RegExp(`^(${followingPhase})(\\d{1,4})(?:(?:\\.|\\:|\\\uFF1A)(\\d{1,2})(?:(?:\\.|\\:|\\\uFF1A)(\\d{1,2})(?:\\.(\\d{1,6}))?)?)?(?:\\s*(a\\.m\\.|p\\.m\\.|am?|pm?))?${followingSuffix}`, "i");
+}
+var HOUR_GROUP = 2;
+var MINUTE_GROUP = 3;
+var SECOND_GROUP = 4;
+var MILLI_SECOND_GROUP = 5;
+var AM_PM_HOUR_GROUP = 6;
+var AbstractTimeExpressionParser = class {
+  strictMode;
+  constructor(strictMode = false) {
+    this.strictMode = strictMode;
+  }
+  patternFlags() {
+    return "i";
+  }
+  primaryPatternLeftBoundary() {
+    return `(^|\\s|T|\\b)`;
+  }
+  primarySuffix() {
+    return `(?!/)(?=\\W|$)`;
+  }
+  followingSuffix() {
+    return `(?!/)(?=\\W|$)`;
+  }
+  pattern(context) {
+    return this.getPrimaryTimePatternThroughCache();
+  }
+  extract(context, match) {
+    const startComponents = this.extractPrimaryTimeComponents(context, match);
+    if (!startComponents) {
+      if (match[0].match(/^\d{4}/)) {
+        match.index += 4;
+        return null;
+      }
+      match.index += match[0].length;
+      return null;
+    }
+    const index = match.index + match[1].length;
+    const text = match[0].substring(match[1].length);
+    const result = context.createParsingResult(index, text, startComponents);
+    match.index += match[0].length;
+    const remainingText = context.text.substring(match.index);
+    const followingPattern = this.getFollowingTimePatternThroughCache();
+    const followingMatch = followingPattern.exec(remainingText);
+    if (text.match(/^\d{3,4}/) && followingMatch) {
+      if (followingMatch[0].match(/^\s*([+-])\s*\d{2,4}$/)) {
+        return null;
+      }
+      if (followingMatch[0].match(/^\s*([+-])\s*\d{2}\W\d{2}/)) {
+        return null;
+      }
+    }
+    if (!followingMatch || followingMatch[0].match(/^\s*([+-])\s*\d{3,4}$/)) {
+      return this.checkAndReturnWithoutFollowingPattern(result);
+    }
+    result.end = this.extractFollowingTimeComponents(context, followingMatch, result);
+    if (result.end) {
+      result.text += followingMatch[0];
+    }
+    return this.checkAndReturnWithFollowingPattern(result);
+  }
+  extractPrimaryTimeComponents(context, match, strict2 = false) {
+    const components = context.createParsingComponents();
+    let minute = 0;
+    let meridiem = null;
+    let hour = parseInt(match[HOUR_GROUP]);
+    if (hour > 100) {
+      if (match[HOUR_GROUP].length == 4 && match[MINUTE_GROUP] == null && !match[AM_PM_HOUR_GROUP]) {
+        return null;
+      }
+      if (this.strictMode || match[MINUTE_GROUP] != null) {
+        return null;
+      }
+      minute = hour % 100;
+      hour = Math.floor(hour / 100);
+    }
+    if (hour > 24) {
+      return null;
+    }
+    if (match[MINUTE_GROUP] != null) {
+      if (match[MINUTE_GROUP].length == 1 && !match[AM_PM_HOUR_GROUP]) {
+        return null;
+      }
+      minute = parseInt(match[MINUTE_GROUP]);
+    }
+    if (minute >= 60) {
+      return null;
+    }
+    if (hour > 12) {
+      meridiem = Meridiem.PM;
+    }
+    if (match[AM_PM_HOUR_GROUP] != null) {
+      if (hour > 12)
+        return null;
+      const ampm = match[AM_PM_HOUR_GROUP][0].toLowerCase();
+      if (ampm == "a") {
+        meridiem = Meridiem.AM;
+        if (hour == 12) {
+          hour = 0;
+        }
+      }
+      if (ampm == "p") {
+        meridiem = Meridiem.PM;
+        if (hour != 12) {
+          hour += 12;
+        }
+      }
+    }
+    components.assign("hour", hour);
+    components.assign("minute", minute);
+    if (meridiem !== null) {
+      components.assign("meridiem", meridiem);
+    } else {
+      if (hour < 12) {
+        components.imply("meridiem", Meridiem.AM);
+      } else {
+        components.imply("meridiem", Meridiem.PM);
+      }
+    }
+    if (match[MILLI_SECOND_GROUP] != null) {
+      const millisecond = parseInt(match[MILLI_SECOND_GROUP].substring(0, 3));
+      if (millisecond >= 1e3)
+        return null;
+      components.assign("millisecond", millisecond);
+    }
+    if (match[SECOND_GROUP] != null) {
+      const second = parseInt(match[SECOND_GROUP]);
+      if (second >= 60)
+        return null;
+      components.assign("second", second);
+    }
+    return components;
+  }
+  extractFollowingTimeComponents(context, match, result) {
+    const components = context.createParsingComponents();
+    if (match[MILLI_SECOND_GROUP] != null) {
+      const millisecond = parseInt(match[MILLI_SECOND_GROUP].substring(0, 3));
+      if (millisecond >= 1e3)
+        return null;
+      components.assign("millisecond", millisecond);
+    }
+    if (match[SECOND_GROUP] != null) {
+      const second = parseInt(match[SECOND_GROUP]);
+      if (second >= 60)
+        return null;
+      components.assign("second", second);
+    }
+    let hour = parseInt(match[HOUR_GROUP]);
+    let minute = 0;
+    let meridiem = -1;
+    if (match[MINUTE_GROUP] != null) {
+      minute = parseInt(match[MINUTE_GROUP]);
+    } else if (hour > 100) {
+      minute = hour % 100;
+      hour = Math.floor(hour / 100);
+    }
+    if (minute >= 60 || hour > 24) {
+      return null;
+    }
+    if (hour >= 12) {
+      meridiem = Meridiem.PM;
+    }
+    if (match[AM_PM_HOUR_GROUP] != null) {
+      if (hour > 12) {
+        return null;
+      }
+      const ampm = match[AM_PM_HOUR_GROUP][0].toLowerCase();
+      if (ampm == "a") {
+        meridiem = Meridiem.AM;
+        if (hour == 12) {
+          hour = 0;
+          if (!components.isCertain("day")) {
+            components.imply("day", components.get("day") + 1);
+          }
+        }
+      }
+      if (ampm == "p") {
+        meridiem = Meridiem.PM;
+        if (hour != 12)
+          hour += 12;
+      }
+      if (!result.start.isCertain("meridiem")) {
+        if (meridiem == Meridiem.AM) {
+          result.start.imply("meridiem", Meridiem.AM);
+          if (result.start.get("hour") == 12) {
+            result.start.assign("hour", 0);
+          }
+        } else {
+          result.start.imply("meridiem", Meridiem.PM);
+          if (result.start.get("hour") != 12) {
+            result.start.assign("hour", result.start.get("hour") + 12);
+          }
+        }
+      }
+    }
+    components.assign("hour", hour);
+    components.assign("minute", minute);
+    if (meridiem >= 0) {
+      components.assign("meridiem", meridiem);
+    } else {
+      const startAtPM = result.start.isCertain("meridiem") && result.start.get("hour") > 12;
+      if (startAtPM) {
+        if (result.start.get("hour") - 12 > hour) {
+          components.imply("meridiem", Meridiem.AM);
+        } else if (hour <= 12) {
+          components.assign("hour", hour + 12);
+          components.assign("meridiem", Meridiem.PM);
+        }
+      } else if (hour > 12) {
+        components.imply("meridiem", Meridiem.PM);
+      } else if (hour <= 12) {
+        components.imply("meridiem", Meridiem.AM);
+      }
+    }
+    if (components.date().getTime() < result.start.date().getTime()) {
+      components.imply("day", components.get("day") + 1);
+    }
+    return components;
+  }
+  checkAndReturnWithoutFollowingPattern(result) {
+    if (result.text.match(/^\d$/)) {
+      return null;
+    }
+    if (result.text.match(/^\d\d\d+$/)) {
+      return null;
+    }
+    if (result.text.match(/\d[apAP]$/)) {
+      return null;
+    }
+    const endingWithNumbers = result.text.match(/[^\d:.](\d[\d.]+)$/);
+    if (endingWithNumbers) {
+      const endingNumbers = endingWithNumbers[1];
+      if (this.strictMode) {
+        return null;
+      }
+      if (endingNumbers.includes(".") && !endingNumbers.match(/\d(\.\d{2})+$/)) {
+        return null;
+      }
+      const endingNumberVal = parseInt(endingNumbers);
+      if (endingNumberVal > 24) {
+        return null;
+      }
+    }
+    return result;
+  }
+  checkAndReturnWithFollowingPattern(result) {
+    if (result.text.match(/^\d+-\d+$/)) {
+      return null;
+    }
+    const endingWithNumbers = result.text.match(/[^\d:.](\d[\d.]+)\s*-\s*(\d[\d.]+)$/);
+    if (endingWithNumbers) {
+      if (this.strictMode) {
+        return null;
+      }
+      const startingNumbers = endingWithNumbers[1];
+      const endingNumbers = endingWithNumbers[2];
+      if (endingNumbers.includes(".") && !endingNumbers.match(/\d(\.\d{2})+$/)) {
+        return null;
+      }
+      const endingNumberVal = parseInt(endingNumbers);
+      const startingNumberVal = parseInt(startingNumbers);
+      if (endingNumberVal > 24 || startingNumberVal > 24) {
+        return null;
+      }
+    }
+    return result;
+  }
+  cachedPrimaryPrefix = null;
+  cachedPrimarySuffix = null;
+  cachedPrimaryTimePattern = null;
+  getPrimaryTimePatternThroughCache() {
+    const primaryPrefix = this.primaryPrefix();
+    const primarySuffix = this.primarySuffix();
+    if (this.cachedPrimaryPrefix === primaryPrefix && this.cachedPrimarySuffix === primarySuffix) {
+      return this.cachedPrimaryTimePattern;
+    }
+    this.cachedPrimaryTimePattern = primaryTimePattern(this.primaryPatternLeftBoundary(), primaryPrefix, primarySuffix, this.patternFlags());
+    this.cachedPrimaryPrefix = primaryPrefix;
+    this.cachedPrimarySuffix = primarySuffix;
+    return this.cachedPrimaryTimePattern;
+  }
+  cachedFollowingPhase = null;
+  cachedFollowingSuffix = null;
+  cachedFollowingTimePatten = null;
+  getFollowingTimePatternThroughCache() {
+    const followingPhase = this.followingPhase();
+    const followingSuffix = this.followingSuffix();
+    if (this.cachedFollowingPhase === followingPhase && this.cachedFollowingSuffix === followingSuffix) {
+      return this.cachedFollowingTimePatten;
+    }
+    this.cachedFollowingTimePatten = followingTimePatten(followingPhase, followingSuffix);
+    this.cachedFollowingPhase = followingPhase;
+    this.cachedFollowingSuffix = followingSuffix;
+    return this.cachedFollowingTimePatten;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENTimeExpressionParser.js
+var ENTimeExpressionParser = class extends AbstractTimeExpressionParser {
+  constructor(strictMode) {
+    super(strictMode);
+  }
+  followingPhase() {
+    return "\\s*(?:\\-|\\\u2013|\\~|\\\u301C|to|until|through|till|\\?)\\s*";
+  }
+  primaryPrefix() {
+    return "(?:(?:at|from)\\s*)??";
+  }
+  primarySuffix() {
+    return "(?:\\s*(?:o\\W*clock|at\\s*night|in\\s*the\\s*(?:morning|afternoon)))?(?!/)(?=\\W|$)";
+  }
+  extractPrimaryTimeComponents(context, match) {
+    const components = super.extractPrimaryTimeComponents(context, match);
+    if (!components) {
+      return components;
+    }
+    if (match[0].endsWith("night")) {
+      const hour = components.get("hour");
+      if (hour >= 6 && hour < 12) {
+        components.assign("hour", components.get("hour") + 12);
+        components.assign("meridiem", Meridiem.PM);
+      } else if (hour < 6) {
+        components.assign("meridiem", Meridiem.AM);
+      }
+    }
+    if (match[0].endsWith("afternoon")) {
+      components.assign("meridiem", Meridiem.PM);
+      const hour = components.get("hour");
+      if (hour >= 0 && hour <= 6) {
+        components.assign("hour", components.get("hour") + 12);
+      }
+    }
+    if (match[0].endsWith("morning")) {
+      components.assign("meridiem", Meridiem.AM);
+      const hour = components.get("hour");
+      if (hour < 12) {
+        components.assign("hour", components.get("hour"));
+      }
+    }
+    return components.addTag("parser/ENTimeExpressionParser");
+  }
+  extractFollowingTimeComponents(context, match, result) {
+    const followingComponents = super.extractFollowingTimeComponents(context, match, result);
+    if (followingComponents) {
+      followingComponents.addTag("parser/ENTimeExpressionParser");
+    }
+    return followingComponents;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENTimeUnitAgoFormatParser.js
+var PATTERN6 = new RegExp(`(${TIME_UNITS_PATTERN})\\s{0,5}(?:ago|before|earlier)(?=\\W|$)`, "i");
+var STRICT_PATTERN = new RegExp(`(${TIME_UNITS_NO_ABBR_PATTERN})\\s{0,5}(?:ago|before|earlier)(?=\\W|$)`, "i");
+var ENTimeUnitAgoFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  strictMode;
+  constructor(strictMode) {
+    super();
+    this.strictMode = strictMode;
+  }
+  innerPattern() {
+    return this.strictMode ? STRICT_PATTERN : PATTERN6;
+  }
+  innerExtract(context, match) {
+    const duration = parseDuration(match[1]);
+    if (!duration) {
+      return null;
+    }
+    return ParsingComponents.createRelativeFromReference(context.reference, reverseDuration(duration));
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENTimeUnitLaterFormatParser.js
+var PATTERN7 = new RegExp(`(${TIME_UNITS_PATTERN})\\s{0,5}(?:later|after|from now|henceforth|forward|out)(?=(?:\\W|$))`, "i");
+var STRICT_PATTERN2 = new RegExp(`(${TIME_UNITS_NO_ABBR_PATTERN})\\s{0,5}(later|after|from now)(?=\\W|$)`, "i");
+var GROUP_NUM_TIMEUNITS = 1;
+var ENTimeUnitLaterFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  strictMode;
+  constructor(strictMode) {
+    super();
+    this.strictMode = strictMode;
+  }
+  innerPattern() {
+    return this.strictMode ? STRICT_PATTERN2 : PATTERN7;
+  }
+  innerExtract(context, match) {
+    const timeUnits = parseDuration(match[GROUP_NUM_TIMEUNITS]);
+    if (!timeUnits) {
+      return null;
+    }
+    return ParsingComponents.createRelativeFromReference(context.reference, timeUnits);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/abstractRefiners.js
+var Filter = class {
+  refine(context, results) {
+    return results.filter((r) => this.isValid(context, r));
+  }
+};
+var MergingRefiner = class {
+  refine(context, results) {
+    if (results.length < 2) {
+      return results;
+    }
+    const mergedResults = [];
+    let curResult = results[0];
+    let nextResult = null;
+    for (let i = 1; i < results.length; i++) {
+      nextResult = results[i];
+      const textBetween = context.text.substring(curResult.index + curResult.text.length, nextResult.index);
+      if (!this.shouldMergeResults(textBetween, curResult, nextResult, context)) {
+        mergedResults.push(curResult);
+        curResult = nextResult;
+      } else {
+        const left = curResult;
+        const right = nextResult;
+        const mergedResult = this.mergeResults(textBetween, left, right, context);
+        context.debug(() => {
+          console.log(`${this.constructor.name} merged ${left} and ${right} into ${mergedResult}`);
+        });
+        curResult = mergedResult;
+      }
+    }
+    if (curResult != null) {
+      mergedResults.push(curResult);
+    }
+    return mergedResults;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/AbstractMergeDateRangeRefiner.js
+var AbstractMergeDateRangeRefiner = class extends MergingRefiner {
+  shouldMergeResults(textBetween, currentResult, nextResult) {
+    return !currentResult.end && !nextResult.end && textBetween.match(this.patternBetween()) != null;
+  }
+  mergeResults(textBetween, fromResult, toResult) {
+    if (!fromResult.start.isOnlyWeekdayComponent() && !toResult.start.isOnlyWeekdayComponent()) {
+      toResult.start.getCertainComponents().forEach((key) => {
+        if (!fromResult.start.isCertain(key)) {
+          fromResult.start.imply(key, toResult.start.get(key));
+        }
+      });
+      fromResult.start.getCertainComponents().forEach((key) => {
+        if (!toResult.start.isCertain(key)) {
+          toResult.start.imply(key, fromResult.start.get(key));
+        }
+      });
+    }
+    if (fromResult.start.date() > toResult.start.date()) {
+      let fromDate = fromResult.start.date();
+      let toDate = toResult.start.date();
+      if (toResult.start.isOnlyWeekdayComponent() && addDuration(toDate, { day: 7 }) > fromDate) {
+        toDate = addDuration(toDate, { day: 7 });
+        toResult.start.imply("day", toDate.getDate());
+        toResult.start.imply("month", toDate.getMonth() + 1);
+        toResult.start.imply("year", toDate.getFullYear());
+      } else if (fromResult.start.isOnlyWeekdayComponent() && addDuration(fromDate, { day: -7 }) < toDate) {
+        fromDate = addDuration(fromDate, { day: -7 });
+        fromResult.start.imply("day", fromDate.getDate());
+        fromResult.start.imply("month", fromDate.getMonth() + 1);
+        fromResult.start.imply("year", fromDate.getFullYear());
+      } else if (toResult.start.isDateWithUnknownYear() && addDuration(toDate, { year: 1 }) > fromDate) {
+        toDate = addDuration(toDate, { year: 1 });
+        toResult.start.imply("year", toDate.getFullYear());
+      } else if (fromResult.start.isDateWithUnknownYear() && addDuration(fromDate, { year: -1 }) < toDate) {
+        fromDate = addDuration(fromDate, { year: -1 });
+        fromResult.start.imply("year", fromDate.getFullYear());
+      } else {
+        [toResult, fromResult] = [fromResult, toResult];
+      }
+    }
+    const result = fromResult.clone();
+    result.start = fromResult.start;
+    result.end = toResult.start;
+    result.index = Math.min(fromResult.index, toResult.index);
+    if (fromResult.index < toResult.index) {
+      result.text = fromResult.text + textBetween + toResult.text;
+    } else {
+      result.text = toResult.text + textBetween + fromResult.text;
+    }
+    return result;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/refiners/ENMergeDateRangeRefiner.js
+var ENMergeDateRangeRefiner = class extends AbstractMergeDateRangeRefiner {
+  patternBetween() {
+    return /^\s*(to|-|–|until|through|till)\s*$/i;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/calculation/mergingCalculation.js
+function mergeDateTimeResult(dateResult, timeResult) {
+  const result = dateResult.clone();
+  const beginDate = dateResult.start;
+  const beginTime = timeResult.start;
+  result.start = mergeDateTimeComponent(beginDate, beginTime);
+  if (dateResult.end != null || timeResult.end != null) {
+    const endDate = dateResult.end == null ? dateResult.start : dateResult.end;
+    const endTime = timeResult.end == null ? timeResult.start : timeResult.end;
+    const endDateTime = mergeDateTimeComponent(endDate, endTime);
+    if (dateResult.end == null && endDateTime.date().getTime() < result.start.date().getTime()) {
+      const nextDay = new Date(endDateTime.date().getTime());
+      nextDay.setDate(nextDay.getDate() + 1);
+      if (endDateTime.isCertain("day")) {
+        assignSimilarDate(endDateTime, nextDay);
+      } else {
+        implySimilarDate(endDateTime, nextDay);
+      }
+    }
+    result.end = endDateTime;
+  }
+  return result;
+}
+function mergeDateTimeComponent(dateComponent, timeComponent) {
+  const dateTimeComponent = dateComponent.clone();
+  if (timeComponent.isCertain("hour")) {
+    dateTimeComponent.assign("hour", timeComponent.get("hour"));
+    dateTimeComponent.assign("minute", timeComponent.get("minute"));
+    if (timeComponent.isCertain("second")) {
+      dateTimeComponent.assign("second", timeComponent.get("second"));
+      if (timeComponent.isCertain("millisecond")) {
+        dateTimeComponent.assign("millisecond", timeComponent.get("millisecond"));
+      } else {
+        dateTimeComponent.imply("millisecond", timeComponent.get("millisecond"));
+      }
+    } else {
+      dateTimeComponent.imply("second", timeComponent.get("second"));
+      dateTimeComponent.imply("millisecond", timeComponent.get("millisecond"));
+    }
+  } else {
+    dateTimeComponent.imply("hour", timeComponent.get("hour"));
+    dateTimeComponent.imply("minute", timeComponent.get("minute"));
+    dateTimeComponent.imply("second", timeComponent.get("second"));
+    dateTimeComponent.imply("millisecond", timeComponent.get("millisecond"));
+  }
+  if (timeComponent.isCertain("timezoneOffset")) {
+    dateTimeComponent.assign("timezoneOffset", timeComponent.get("timezoneOffset"));
+  }
+  if (timeComponent.isCertain("meridiem")) {
+    dateTimeComponent.assign("meridiem", timeComponent.get("meridiem"));
+  } else if (timeComponent.get("meridiem") != null && dateTimeComponent.get("meridiem") == null) {
+    dateTimeComponent.imply("meridiem", timeComponent.get("meridiem"));
+  }
+  if (dateTimeComponent.get("meridiem") == Meridiem.PM && dateTimeComponent.get("hour") < 12) {
+    if (timeComponent.isCertain("hour")) {
+      dateTimeComponent.assign("hour", dateTimeComponent.get("hour") + 12);
+    } else {
+      dateTimeComponent.imply("hour", dateTimeComponent.get("hour") + 12);
+    }
+  }
+  dateTimeComponent.addTags(dateComponent.tags());
+  dateTimeComponent.addTags(timeComponent.tags());
+  return dateTimeComponent;
+}
+
+// node_modules/chrono-node/dist/esm/common/refiners/AbstractMergeDateTimeRefiner.js
+var AbstractMergeDateTimeRefiner = class extends MergingRefiner {
+  shouldMergeResults(textBetween, currentResult, nextResult) {
+    return (currentResult.start.isOnlyDate() && nextResult.start.isOnlyTime() || nextResult.start.isOnlyDate() && currentResult.start.isOnlyTime()) && textBetween.match(this.patternBetween()) != null;
+  }
+  mergeResults(textBetween, currentResult, nextResult) {
+    const result = currentResult.start.isOnlyDate() ? mergeDateTimeResult(currentResult, nextResult) : mergeDateTimeResult(nextResult, currentResult);
+    result.index = currentResult.index;
+    result.text = currentResult.text + textBetween + nextResult.text;
+    return result;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/refiners/ENMergeDateTimeRefiner.js
+var ENMergeDateTimeRefiner = class extends AbstractMergeDateTimeRefiner {
+  patternBetween() {
+    return new RegExp("^\\s*(T|at|after|before|on|of|,|-|\\.|\u2219|:)?\\s*$");
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/ExtractTimezoneAbbrRefiner.js
+var TIMEZONE_NAME_PATTERN = new RegExp("^\\s*,?\\s*\\(?([A-Z]{2,4})\\)?(?=\\W|$)", "i");
+var ExtractTimezoneAbbrRefiner = class {
+  timezoneOverrides;
+  constructor(timezoneOverrides) {
+    this.timezoneOverrides = timezoneOverrides;
+  }
+  refine(context, results) {
+    const timezoneOverrides = context.option.timezones ?? {};
+    results.forEach((result) => {
+      const suffix = context.text.substring(result.index + result.text.length);
+      const match = TIMEZONE_NAME_PATTERN.exec(suffix);
+      if (!match) {
+        return;
+      }
+      const timezoneAbbr = match[1].toUpperCase();
+      const refDate = result.start.date() ?? result.refDate ?? /* @__PURE__ */ new Date();
+      const tzOverrides = { ...this.timezoneOverrides, ...timezoneOverrides };
+      const extractedTimezoneOffset = toTimezoneOffset(timezoneAbbr, refDate, tzOverrides);
+      if (extractedTimezoneOffset == null) {
+        return;
+      }
+      context.debug(() => {
+        console.log(`Extracting timezone: '${timezoneAbbr}' into: ${extractedTimezoneOffset} for: ${result.start}`);
+      });
+      const currentTimezoneOffset = result.start.get("timezoneOffset");
+      if (currentTimezoneOffset !== null && extractedTimezoneOffset != currentTimezoneOffset) {
+        if (result.start.isCertain("timezoneOffset")) {
+          return;
+        }
+        if (timezoneAbbr != match[1]) {
+          return;
+        }
+      }
+      if (result.start.isOnlyDate()) {
+        if (timezoneAbbr != match[1]) {
+          return;
+        }
+      }
+      result.text += match[0];
+      if (!result.start.isCertain("timezoneOffset")) {
+        result.start.assign("timezoneOffset", extractedTimezoneOffset);
+      }
+      if (result.end != null && !result.end.isCertain("timezoneOffset")) {
+        result.end.assign("timezoneOffset", extractedTimezoneOffset);
+      }
+    });
+    return results;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/ExtractTimezoneOffsetRefiner.js
+var TIMEZONE_OFFSET_PATTERN = new RegExp("^\\s*(?:\\(?(?:GMT|UTC)\\s?)?([+-])(\\d{1,2})(?::?(\\d{2}))?\\)?", "i");
+var TIMEZONE_OFFSET_SIGN_GROUP = 1;
+var TIMEZONE_OFFSET_HOUR_OFFSET_GROUP = 2;
+var TIMEZONE_OFFSET_MINUTE_OFFSET_GROUP = 3;
+var ExtractTimezoneOffsetRefiner = class {
+  refine(context, results) {
+    results.forEach(function(result) {
+      if (result.start.isCertain("timezoneOffset")) {
+        return;
+      }
+      const suffix = context.text.substring(result.index + result.text.length);
+      const match = TIMEZONE_OFFSET_PATTERN.exec(suffix);
+      if (!match) {
+        return;
+      }
+      context.debug(() => {
+        console.log(`Extracting timezone: '${match[0]}' into : ${result}`);
+      });
+      const hourOffset = parseInt(match[TIMEZONE_OFFSET_HOUR_OFFSET_GROUP]);
+      const minuteOffset = parseInt(match[TIMEZONE_OFFSET_MINUTE_OFFSET_GROUP] || "0");
+      let timezoneOffset = hourOffset * 60 + minuteOffset;
+      if (timezoneOffset > 14 * 60) {
+        return;
+      }
+      if (match[TIMEZONE_OFFSET_SIGN_GROUP] === "-") {
+        timezoneOffset = -timezoneOffset;
+      }
+      if (result.end != null) {
+        result.end.assign("timezoneOffset", timezoneOffset);
+      }
+      result.start.assign("timezoneOffset", timezoneOffset);
+      result.text += match[0];
+    });
+    return results;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/OverlapRemovalRefiner.js
+var OverlapRemovalRefiner = class {
+  refine(context, results) {
+    if (results.length < 2) {
+      return results;
+    }
+    const filteredResults = [];
+    let prevResult = results[0];
+    for (let i = 1; i < results.length; i++) {
+      const result = results[i];
+      if (result.index >= prevResult.index + prevResult.text.length) {
+        filteredResults.push(prevResult);
+        prevResult = result;
+        continue;
+      }
+      let kept = null;
+      let removed = null;
+      if (result.text.length > prevResult.text.length) {
+        kept = result;
+        removed = prevResult;
+      } else {
+        kept = prevResult;
+        removed = result;
+      }
+      context.debug(() => {
+        console.log(`${this.constructor.name} remove ${removed} by ${kept}`);
+      });
+      prevResult = kept;
+    }
+    if (prevResult != null) {
+      filteredResults.push(prevResult);
+    }
+    return filteredResults;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/ForwardDateRefiner.js
+var ForwardDateRefiner = class {
+  refine(context, results) {
+    if (!context.option.forwardDate) {
+      return results;
+    }
+    results.forEach((result) => {
+      let refDate = context.reference.getDateWithAdjustedTimezone();
+      if (result.start.isOnlyTime() && context.reference.instant > result.start.date()) {
+        const refDate2 = context.reference.getDateWithAdjustedTimezone();
+        const refFollowingDay = new Date(refDate2);
+        refFollowingDay.setDate(refFollowingDay.getDate() + 1);
+        implySimilarDate(result.start, refFollowingDay);
+        context.debug(() => {
+          console.log(`${this.constructor.name} adjusted ${result} time from the ref date (${refDate2}) to the following day (${refFollowingDay})`);
+        });
+        if (result.end && result.end.isOnlyTime()) {
+          implySimilarDate(result.end, refFollowingDay);
+          if (result.start.date() > result.end.date()) {
+            refFollowingDay.setDate(refFollowingDay.getDate() + 1);
+            implySimilarDate(result.end, refFollowingDay);
+          }
+        }
+      }
+      if (result.start.isOnlyWeekdayComponent() && refDate > result.start.date()) {
+        let daysToAdd = result.start.get("weekday") - refDate.getDay();
+        if (daysToAdd <= 0) {
+          daysToAdd += 7;
+        }
+        refDate = addDuration(refDate, { day: daysToAdd });
+        implySimilarDate(result.start, refDate);
+        context.debug(() => {
+          console.log(`${this.constructor.name} adjusted ${result} weekday (${result.start})`);
+        });
+        if (result.end && result.end.isOnlyWeekdayComponent()) {
+          let daysToAdd2 = result.end.get("weekday") - refDate.getDay();
+          if (daysToAdd2 <= 0) {
+            daysToAdd2 += 7;
+          }
+          refDate = addDuration(refDate, { day: daysToAdd2 });
+          implySimilarDate(result.end, refDate);
+          context.debug(() => {
+            console.log(`${this.constructor.name} adjusted ${result} weekday (${result.end})`);
+          });
+        }
+      }
+      if (result.start.isDateWithUnknownYear() && refDate > result.start.date()) {
+        for (let i = 0; i < 3 && refDate > result.start.date(); i++) {
+          result.start.imply("year", result.start.get("year") + 1);
+          context.debug(() => {
+            console.log(`${this.constructor.name} adjusted ${result} year (${result.start})`);
+          });
+          if (result.end && !result.end.isCertain("year")) {
+            result.end.imply("year", result.end.get("year") + 1);
+            context.debug(() => {
+              console.log(`${this.constructor.name} adjusted ${result} month (${result.start})`);
+            });
+          }
+        }
+      }
+    });
+    return results;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/UnlikelyFormatFilter.js
+var UnlikelyFormatFilter = class extends Filter {
+  strictMode;
+  constructor(strictMode) {
+    super();
+    this.strictMode = strictMode;
+  }
+  isValid(context, result) {
+    if (result.text.replace(" ", "").match(/^\d*(\.\d*)?$/)) {
+      context.debug(() => {
+        console.log(`Removing unlikely result '${result.text}'`);
+      });
+      return false;
+    }
+    if (!result.start.isValidDate()) {
+      context.debug(() => {
+        console.log(`Removing invalid result: ${result} (${result.start})`);
+      });
+      return false;
+    }
+    if (result.end && !result.end.isValidDate()) {
+      context.debug(() => {
+        console.log(`Removing invalid result: ${result} (${result.end})`);
+      });
+      return false;
+    }
+    if (this.strictMode) {
+      return this.isStrictModeValid(context, result);
+    }
+    return true;
+  }
+  isStrictModeValid(context, result) {
+    if (result.start.isOnlyWeekdayComponent()) {
+      context.debug(() => {
+        console.log(`(Strict) Removing weekday only component: ${result} (${result.end})`);
+      });
+      return false;
+    }
+    return true;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/parsers/ISOFormatParser.js
+var PATTERN8 = new RegExp("([0-9]{4})\\-([0-9]{1,2})\\-([0-9]{1,2})(?:T([0-9]{1,2}):([0-9]{1,2})(?::([0-9]{1,2})(?:\\.(\\d{1,4}))?)?(Z|([+-]\\d{2}):?(\\d{2})?)?)?(?=\\W|$)", "i");
+var YEAR_NUMBER_GROUP2 = 1;
+var MONTH_NUMBER_GROUP2 = 2;
+var DATE_NUMBER_GROUP2 = 3;
+var HOUR_NUMBER_GROUP = 4;
+var MINUTE_NUMBER_GROUP = 5;
+var SECOND_NUMBER_GROUP = 6;
+var MILLISECOND_NUMBER_GROUP = 7;
+var TZD_GROUP = 8;
+var TZD_HOUR_OFFSET_GROUP = 9;
+var TZD_MINUTE_OFFSET_GROUP = 10;
+var ISOFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN8;
+  }
+  innerExtract(context, match) {
+    const components = context.createParsingComponents({
+      "year": parseInt(match[YEAR_NUMBER_GROUP2]),
+      "month": parseInt(match[MONTH_NUMBER_GROUP2]),
+      "day": parseInt(match[DATE_NUMBER_GROUP2])
+    });
+    if (match[HOUR_NUMBER_GROUP] != null) {
+      components.assign("hour", parseInt(match[HOUR_NUMBER_GROUP]));
+      components.assign("minute", parseInt(match[MINUTE_NUMBER_GROUP]));
+      if (match[SECOND_NUMBER_GROUP] != null) {
+        components.assign("second", parseInt(match[SECOND_NUMBER_GROUP]));
+      }
+      if (match[MILLISECOND_NUMBER_GROUP] != null) {
+        components.assign("millisecond", parseInt(match[MILLISECOND_NUMBER_GROUP]));
+      }
+      if (match[TZD_GROUP] != null) {
+        let offset = 0;
+        if (match[TZD_HOUR_OFFSET_GROUP]) {
+          const hourOffset = parseInt(match[TZD_HOUR_OFFSET_GROUP]);
+          let minuteOffset = 0;
+          if (match[TZD_MINUTE_OFFSET_GROUP] != null) {
+            minuteOffset = parseInt(match[TZD_MINUTE_OFFSET_GROUP]);
+          }
+          offset = hourOffset * 60;
+          if (offset < 0) {
+            offset -= minuteOffset;
+          } else {
+            offset += minuteOffset;
+          }
+        }
+        components.assign("timezoneOffset", offset);
+      }
+    }
+    return components.addTag("parser/ISOFormatParser");
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/refiners/MergeWeekdayComponentRefiner.js
+var MergeWeekdayComponentRefiner = class extends MergingRefiner {
+  mergeResults(textBetween, currentResult, nextResult) {
+    const newResult = nextResult.clone();
+    newResult.index = currentResult.index;
+    newResult.text = currentResult.text + textBetween + newResult.text;
+    newResult.start.assign("weekday", currentResult.start.get("weekday"));
+    if (newResult.end) {
+      newResult.end.assign("weekday", currentResult.start.get("weekday"));
+    }
+    return newResult;
+  }
+  shouldMergeResults(textBetween, currentResult, nextResult) {
+    const weekdayThenNormalDate = currentResult.start.isOnlyWeekdayComponent() && !currentResult.start.isCertain("hour") && nextResult.start.isCertain("day");
+    return weekdayThenNormalDate && textBetween.match(/^,?\s*$/) != null;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/configurations.js
+function includeCommonConfiguration(configuration2, strictMode = false) {
+  configuration2.parsers.unshift(new ISOFormatParser());
+  configuration2.refiners.unshift(new MergeWeekdayComponentRefiner());
+  configuration2.refiners.unshift(new ExtractTimezoneOffsetRefiner());
+  configuration2.refiners.unshift(new OverlapRemovalRefiner());
+  configuration2.refiners.push(new ExtractTimezoneAbbrRefiner());
+  configuration2.refiners.push(new OverlapRemovalRefiner());
+  configuration2.refiners.push(new ForwardDateRefiner());
+  configuration2.refiners.push(new UnlikelyFormatFilter(strictMode));
+  return configuration2;
+}
+
+// node_modules/chrono-node/dist/esm/common/casualReferences.js
+function now(reference) {
+  const targetDate = reference.getDateWithAdjustedTimezone();
+  const component = new ParsingComponents(reference, {});
+  assignSimilarDate(component, targetDate);
+  assignSimilarTime(component, targetDate);
+  component.assign("timezoneOffset", reference.getTimezoneOffset());
+  component.addTag("casualReference/now");
+  return component;
+}
+function today(reference) {
+  const targetDate = reference.getDateWithAdjustedTimezone();
+  const component = new ParsingComponents(reference, {});
+  assignSimilarDate(component, targetDate);
+  implySimilarTime(component, targetDate);
+  component.delete("meridiem");
+  component.addTag("casualReference/today");
+  return component;
+}
+function yesterday(reference) {
+  return theDayBefore(reference, 1).addTag("casualReference/yesterday");
+}
+function tomorrow(reference) {
+  return theDayAfter(reference, 1).addTag("casualReference/tomorrow");
+}
+function theDayBefore(reference, numDay) {
+  return theDayAfter(reference, -numDay);
+}
+function theDayAfter(reference, nDays) {
+  const targetDate = reference.getDateWithAdjustedTimezone();
+  const component = new ParsingComponents(reference, {});
+  const newDate = new Date(targetDate.getTime());
+  newDate.setDate(newDate.getDate() + nDays);
+  assignSimilarDate(component, newDate);
+  implySimilarTime(component, newDate);
+  component.delete("meridiem");
+  return component;
+}
+function tonight(reference, implyHour = 22) {
+  const targetDate = reference.getDateWithAdjustedTimezone();
+  const component = new ParsingComponents(reference, {});
+  assignSimilarDate(component, targetDate);
+  component.imply("hour", implyHour);
+  component.imply("meridiem", Meridiem.PM);
+  component.addTag("casualReference/tonight");
+  return component;
+}
+function evening(reference, implyHour = 20) {
+  const component = new ParsingComponents(reference, {});
+  component.imply("meridiem", Meridiem.PM);
+  component.imply("hour", implyHour);
+  component.addTag("casualReference/evening");
+  return component;
+}
+function midnight(reference) {
+  const component = new ParsingComponents(reference, {});
+  if (reference.getDateWithAdjustedTimezone().getHours() > 2) {
+    component.addDurationAsImplied({ day: 1 });
+  }
+  component.assign("hour", 0);
+  component.imply("minute", 0);
+  component.imply("second", 0);
+  component.imply("millisecond", 0);
+  component.addTag("casualReference/midnight");
+  return component;
+}
+function morning(reference, implyHour = 6) {
+  const component = new ParsingComponents(reference, {});
+  component.imply("meridiem", Meridiem.AM);
+  component.imply("hour", implyHour);
+  component.imply("minute", 0);
+  component.imply("second", 0);
+  component.imply("millisecond", 0);
+  component.addTag("casualReference/morning");
+  return component;
+}
+function afternoon(reference, implyHour = 15) {
+  const component = new ParsingComponents(reference, {});
+  component.imply("meridiem", Meridiem.PM);
+  component.imply("hour", implyHour);
+  component.imply("minute", 0);
+  component.imply("second", 0);
+  component.imply("millisecond", 0);
+  component.addTag("casualReference/afternoon");
+  return component;
+}
+function noon(reference) {
+  const component = new ParsingComponents(reference, {});
+  component.imply("meridiem", Meridiem.AM);
+  component.assign("hour", 12);
+  component.imply("minute", 0);
+  component.imply("second", 0);
+  component.imply("millisecond", 0);
+  component.addTag("casualReference/noon");
+  return component;
+}
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENCasualDateParser.js
+var PATTERN9 = /(now|today|tonight|tomorrow|overmorrow|tmr|tmrw|yesterday|last\s*night)(?=\W|$)/i;
+var ENCasualDateParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern(context) {
+    return PATTERN9;
+  }
+  innerExtract(context, match) {
+    let targetDate = context.refDate;
+    const lowerText = match[0].toLowerCase();
+    let component = context.createParsingComponents();
+    switch (lowerText) {
+      case "now":
+        component = now(context.reference);
+        break;
+      case "today":
+        component = today(context.reference);
+        break;
+      case "yesterday":
+        component = yesterday(context.reference);
+        break;
+      case "tomorrow":
+      case "tmr":
+      case "tmrw":
+        component = tomorrow(context.reference);
+        break;
+      case "tonight":
+        component = tonight(context.reference);
+        break;
+      case "overmorrow":
+        component = theDayAfter(context.reference, 2);
+        break;
+      default:
+        if (lowerText.match(/last\s*night/)) {
+          if (targetDate.getHours() > 6) {
+            const previousDay = new Date(targetDate.getTime());
+            previousDay.setDate(previousDay.getDate() - 1);
+            targetDate = previousDay;
+          }
+          assignSimilarDate(component, targetDate);
+          component.imply("hour", 0);
+        }
+        break;
+    }
+    component.addTag("parser/ENCasualDateParser");
+    return component;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENCasualTimeParser.js
+var PATTERN10 = /(?:this)?\s{0,3}(morning|afternoon|evening|night|midnight|midday|noon)(?=\W|$)/i;
+var ENCasualTimeParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN10;
+  }
+  innerExtract(context, match) {
+    let component = null;
+    switch (match[1].toLowerCase()) {
+      case "afternoon":
+        component = afternoon(context.reference);
+        break;
+      case "evening":
+      case "night":
+        component = evening(context.reference);
+        break;
+      case "midnight":
+        component = midnight(context.reference);
+        break;
+      case "morning":
+        component = morning(context.reference);
+        break;
+      case "noon":
+      case "midday":
+        component = noon(context.reference);
+        break;
+    }
+    if (component) {
+      component.addTag("parser/ENCasualTimeParser");
+    }
+    return component;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/calculation/weekdays.js
+function createParsingComponentsAtWeekday(reference, weekday, modifier) {
+  const refDate = reference.getDateWithAdjustedTimezone();
+  const daysToWeekday = getDaysToWeekday(refDate, weekday, modifier);
+  let components = new ParsingComponents(reference);
+  components = components.addDurationAsImplied({ day: daysToWeekday });
+  components.assign("weekday", weekday);
+  return components;
+}
+function getDaysToWeekday(refDate, weekday, modifier) {
+  const refWeekday = refDate.getDay();
+  switch (modifier) {
+    case "this":
+      return getDaysForwardToWeekday(refDate, weekday);
+    case "last":
+      return getBackwardDaysToWeekday(refDate, weekday);
+    case "next":
+      if (refWeekday == Weekday.SUNDAY) {
+        return weekday == Weekday.SUNDAY ? 7 : weekday;
+      }
+      if (refWeekday == Weekday.SATURDAY) {
+        if (weekday == Weekday.SATURDAY)
+          return 7;
+        if (weekday == Weekday.SUNDAY)
+          return 8;
+        return 1 + weekday;
+      }
+      if (weekday < refWeekday && weekday != Weekday.SUNDAY) {
+        return getDaysForwardToWeekday(refDate, weekday);
+      } else {
+        return getDaysForwardToWeekday(refDate, weekday) + 7;
+      }
+  }
+  return getDaysToWeekdayClosest(refDate, weekday);
+}
+function getDaysToWeekdayClosest(refDate, weekday) {
+  const backward = getBackwardDaysToWeekday(refDate, weekday);
+  const forward = getDaysForwardToWeekday(refDate, weekday);
+  return forward < -backward ? forward : backward;
+}
+function getDaysForwardToWeekday(refDate, weekday) {
+  const refWeekday = refDate.getDay();
+  let forwardCount = weekday - refWeekday;
+  if (forwardCount < 0) {
+    forwardCount += 7;
+  }
+  return forwardCount;
+}
+function getBackwardDaysToWeekday(refDate, weekday) {
+  const refWeekday = refDate.getDay();
+  let backwardCount = weekday - refWeekday;
+  if (backwardCount >= 0) {
+    backwardCount -= 7;
+  }
+  return backwardCount;
+}
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENWeekdayParser.js
+var PATTERN11 = new RegExp(`(?:(?:\\,|\\(|\\\uFF08)\\s*)?(?:on\\s*?)?(?:(this|last|past|next)\\s*)?(${matchAnyPattern(WEEKDAY_DICTIONARY)}|weekend|weekday)(?:\\s*(?:\\,|\\)|\\\uFF09))?(?:\\s*(this|last|past|next)\\s*week)?(?=\\W|$)`, "i");
+var PREFIX_GROUP2 = 1;
+var WEEKDAY_GROUP = 2;
+var POSTFIX_GROUP = 3;
+var ENWeekdayParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN11;
+  }
+  innerExtract(context, match) {
+    const prefix = match[PREFIX_GROUP2];
+    const postfix = match[POSTFIX_GROUP];
+    let modifierWord = prefix || postfix;
+    modifierWord = modifierWord || "";
+    modifierWord = modifierWord.toLowerCase();
+    let modifier = null;
+    if (modifierWord == "last" || modifierWord == "past") {
+      modifier = "last";
+    } else if (modifierWord == "next") {
+      modifier = "next";
+    } else if (modifierWord == "this") {
+      modifier = "this";
+    }
+    const weekday_word = match[WEEKDAY_GROUP].toLowerCase();
+    let weekday;
+    if (WEEKDAY_DICTIONARY[weekday_word] !== void 0) {
+      weekday = WEEKDAY_DICTIONARY[weekday_word];
+    } else if (weekday_word == "weekend") {
+      weekday = modifier == "last" ? Weekday.SUNDAY : Weekday.SATURDAY;
+    } else if (weekday_word == "weekday") {
+      const refWeekday = context.reference.getDateWithAdjustedTimezone().getDay();
+      if (refWeekday == Weekday.SUNDAY || refWeekday == Weekday.SATURDAY) {
+        weekday = modifier == "last" ? Weekday.FRIDAY : Weekday.MONDAY;
+      } else {
+        weekday = refWeekday - 1;
+        weekday = modifier == "last" ? weekday - 1 : weekday + 1;
+        weekday = weekday % 5 + 1;
+      }
+    } else {
+      return null;
+    }
+    return createParsingComponentsAtWeekday(context.reference, weekday, modifier);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENRelativeDateFormatParser.js
+var PATTERN12 = new RegExp(`(this|last|past|next|after\\s*this)\\s*(${matchAnyPattern(TIME_UNIT_DICTIONARY)})(?=\\s*)(?=\\W|$)`, "i");
+var MODIFIER_WORD_GROUP = 1;
+var RELATIVE_WORD_GROUP = 2;
+var ENRelativeDateFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  innerPattern() {
+    return PATTERN12;
+  }
+  innerExtract(context, match) {
+    const modifier = match[MODIFIER_WORD_GROUP].toLowerCase();
+    const unitWord = match[RELATIVE_WORD_GROUP].toLowerCase();
+    const timeunit = TIME_UNIT_DICTIONARY[unitWord];
+    if (modifier == "next" || modifier.startsWith("after")) {
+      const timeUnits = {};
+      timeUnits[timeunit] = 1;
+      return ParsingComponents.createRelativeFromReference(context.reference, timeUnits);
+    }
+    if (modifier == "last" || modifier == "past") {
+      const timeUnits = {};
+      timeUnits[timeunit] = -1;
+      return ParsingComponents.createRelativeFromReference(context.reference, timeUnits);
+    }
+    const components = context.createParsingComponents();
+    let date = new Date(context.reference.instant.getTime());
+    if (unitWord.match(/week/i)) {
+      date.setDate(date.getDate() - date.getDay());
+      components.imply("day", date.getDate());
+      components.imply("month", date.getMonth() + 1);
+      components.imply("year", date.getFullYear());
+    } else if (unitWord.match(/month/i)) {
+      date.setDate(1);
+      components.imply("day", date.getDate());
+      components.assign("year", date.getFullYear());
+      components.assign("month", date.getMonth() + 1);
+    } else if (unitWord.match(/year/i)) {
+      date.setDate(1);
+      date.setMonth(0);
+      components.imply("day", date.getDate());
+      components.imply("month", date.getMonth() + 1);
+      components.assign("year", date.getFullYear());
+    }
+    return components;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/common/parsers/SlashDateFormatParser.js
+var PATTERN13 = new RegExp("([^\\d]|^)([0-3]{0,1}[0-9]{1})[\\/\\.\\-]([0-3]{0,1}[0-9]{1})(?:[\\/\\.\\-]([0-9]{4}|[0-9]{2}))?(\\W|$)", "i");
+var OPENING_GROUP = 1;
+var ENDING_GROUP = 5;
+var FIRST_NUMBERS_GROUP = 2;
+var SECOND_NUMBERS_GROUP = 3;
+var YEAR_GROUP5 = 4;
+var SlashDateFormatParser = class {
+  groupNumberMonth;
+  groupNumberDay;
+  constructor(littleEndian) {
+    this.groupNumberMonth = littleEndian ? SECOND_NUMBERS_GROUP : FIRST_NUMBERS_GROUP;
+    this.groupNumberDay = littleEndian ? FIRST_NUMBERS_GROUP : SECOND_NUMBERS_GROUP;
+  }
+  pattern() {
+    return PATTERN13;
+  }
+  extract(context, match) {
+    const index = match.index + match[OPENING_GROUP].length;
+    const indexEnd = match.index + match[0].length - match[ENDING_GROUP].length;
+    if (index > 0) {
+      const textBefore = context.text.substring(0, index);
+      if (textBefore.match("\\d/?$")) {
+        return;
+      }
+    }
+    if (indexEnd < context.text.length) {
+      const textAfter = context.text.substring(indexEnd);
+      if (textAfter.match("^/?\\d")) {
+        return;
+      }
+    }
+    const text = context.text.substring(index, indexEnd);
+    if (text.match(/^\d\.\d$/) || text.match(/^\d\.\d{1,2}\.\d{1,2}\s*$/)) {
+      return;
+    }
+    if (!match[YEAR_GROUP5] && text.indexOf("/") < 0) {
+      return;
+    }
+    const result = context.createParsingResult(index, text);
+    let month = parseInt(match[this.groupNumberMonth]);
+    let day = parseInt(match[this.groupNumberDay]);
+    if (month < 1 || month > 12) {
+      if (month > 12) {
+        if (day >= 1 && day <= 12 && month <= 31) {
+          [day, month] = [month, day];
+        } else {
+          return null;
+        }
+      }
+    }
+    if (day < 1 || day > 31) {
+      return null;
+    }
+    result.start.assign("day", day);
+    result.start.assign("month", month);
+    if (match[YEAR_GROUP5]) {
+      const rawYearNumber = parseInt(match[YEAR_GROUP5]);
+      const year = findMostLikelyADYear(rawYearNumber);
+      result.start.assign("year", year);
+    } else {
+      const year = findYearClosestToRef(context.refDate, day, month);
+      result.start.imply("year", year);
+    }
+    return result.addTag("parser/SlashDateFormatParser");
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/parsers/ENTimeUnitCasualRelativeFormatParser.js
+var PATTERN14 = new RegExp(`(this|last|past|next|after|\\+|-)\\s*(${TIME_UNITS_PATTERN})(?=\\W|$)`, "i");
+var PATTERN_NO_ABBR = new RegExp(`(this|last|past|next|after|\\+|-)\\s*(${TIME_UNITS_NO_ABBR_PATTERN})(?=\\W|$)`, "i");
+var ENTimeUnitCasualRelativeFormatParser = class extends AbstractParserWithWordBoundaryChecking {
+  allowAbbreviations;
+  constructor(allowAbbreviations = true) {
+    super();
+    this.allowAbbreviations = allowAbbreviations;
+  }
+  innerPattern() {
+    return this.allowAbbreviations ? PATTERN14 : PATTERN_NO_ABBR;
+  }
+  innerExtract(context, match) {
+    const prefix = match[1].toLowerCase();
+    let duration = parseDuration(match[2]);
+    if (!duration) {
+      return null;
+    }
+    switch (prefix) {
+      case "last":
+      case "past":
+      case "-":
+        duration = reverseDuration(duration);
+        break;
+    }
+    return ParsingComponents.createRelativeFromReference(context.reference, duration);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/refiners/ENMergeRelativeAfterDateRefiner.js
+function IsPositiveFollowingReference(result) {
+  return result.text.match(/^[+-]/i) != null;
+}
+function IsNegativeFollowingReference(result) {
+  return result.text.match(/^-/i) != null;
+}
+var ENMergeRelativeAfterDateRefiner = class extends MergingRefiner {
+  shouldMergeResults(textBetween, currentResult, nextResult) {
+    if (!textBetween.match(/^\s*$/i)) {
+      return false;
+    }
+    return IsPositiveFollowingReference(nextResult) || IsNegativeFollowingReference(nextResult);
+  }
+  mergeResults(textBetween, currentResult, nextResult, context) {
+    let timeUnits = parseDuration(nextResult.text);
+    if (IsNegativeFollowingReference(nextResult)) {
+      timeUnits = reverseDuration(timeUnits);
+    }
+    const components = ParsingComponents.createRelativeFromReference(ReferenceWithTimezone.fromDate(currentResult.start.date()), timeUnits);
+    return new ParsingResult(currentResult.reference, currentResult.index, `${currentResult.text}${textBetween}${nextResult.text}`, components);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/refiners/ENMergeRelativeFollowByDateRefiner.js
+function hasImpliedEarlierReferenceDate(result) {
+  return result.text.match(/\s+(before|from)$/i) != null;
+}
+function hasImpliedLaterReferenceDate(result) {
+  return result.text.match(/\s+(after|since)$/i) != null;
+}
+var ENMergeRelativeFollowByDateRefiner = class extends MergingRefiner {
+  patternBetween() {
+    return /^\s*$/i;
+  }
+  shouldMergeResults(textBetween, currentResult, nextResult) {
+    if (!textBetween.match(this.patternBetween())) {
+      return false;
+    }
+    if (!hasImpliedEarlierReferenceDate(currentResult) && !hasImpliedLaterReferenceDate(currentResult)) {
+      return false;
+    }
+    return !!nextResult.start.get("day") && !!nextResult.start.get("month") && !!nextResult.start.get("year");
+  }
+  mergeResults(textBetween, currentResult, nextResult) {
+    let duration = parseDuration(currentResult.text);
+    if (hasImpliedEarlierReferenceDate(currentResult)) {
+      duration = reverseDuration(duration);
+    }
+    const components = ParsingComponents.createRelativeFromReference(ReferenceWithTimezone.fromDate(nextResult.start.date()), duration);
+    return new ParsingResult(nextResult.reference, currentResult.index, `${currentResult.text}${textBetween}${nextResult.text}`, components);
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/refiners/ENExtractYearSuffixRefiner.js
+var YEAR_SUFFIX_PATTERN = new RegExp(`^\\s*(${YEAR_PATTERN})`, "i");
+var YEAR_GROUP6 = 1;
+var ENExtractYearSuffixRefiner = class {
+  refine(context, results) {
+    results.forEach(function(result) {
+      if (!result.start.isDateWithUnknownYear()) {
+        return;
+      }
+      const suffix = context.text.substring(result.index + result.text.length);
+      const match = YEAR_SUFFIX_PATTERN.exec(suffix);
+      if (!match) {
+        return;
+      }
+      if (match[0].trim().length <= 3) {
+        return;
+      }
+      context.debug(() => {
+        console.log(`Extracting year: '${match[0]}' into : ${result}`);
+      });
+      const year = parseYear(match[YEAR_GROUP6]);
+      if (result.end != null) {
+        result.end.assign("year", year);
+      }
+      result.start.assign("year", year);
+      result.text += match[0];
+    });
+    return results;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/refiners/ENUnlikelyFormatFilter.js
+var ENUnlikelyFormatFilter = class extends Filter {
+  constructor() {
+    super();
+  }
+  isValid(context, result) {
+    const text = result.text.trim();
+    if (text === context.text.trim()) {
+      return true;
+    }
+    if (text.toLowerCase() === "may") {
+      const textBefore = context.text.substring(0, result.index).trim();
+      if (!textBefore.match(/\b(in)$/i)) {
+        context.debug(() => {
+          console.log(`Removing unlikely result: ${result}`);
+        });
+        return false;
+      }
+    }
+    if (text.toLowerCase().endsWith("the second")) {
+      const textAfter = context.text.substring(result.index + result.text.length).trim();
+      if (textAfter.length > 0) {
+        context.debug(() => {
+          console.log(`Removing unlikely result: ${result}`);
+        });
+      }
+      return false;
+    }
+    return true;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/configuration.js
+var ENDefaultConfiguration = class {
+  createCasualConfiguration(littleEndian = false) {
+    const option = this.createConfiguration(false, littleEndian);
+    option.parsers.push(new ENCasualDateParser());
+    option.parsers.push(new ENCasualTimeParser());
+    option.parsers.push(new ENMonthNameParser());
+    option.parsers.push(new ENRelativeDateFormatParser());
+    option.parsers.push(new ENTimeUnitCasualRelativeFormatParser());
+    option.refiners.push(new ENUnlikelyFormatFilter());
+    return option;
+  }
+  createConfiguration(strictMode = true, littleEndian = false) {
+    const options = includeCommonConfiguration({
+      parsers: [
+        new SlashDateFormatParser(littleEndian),
+        new ENTimeUnitWithinFormatParser(strictMode),
+        new ENMonthNameLittleEndianParser(),
+        new ENMonthNameMiddleEndianParser(littleEndian),
+        new ENWeekdayParser(),
+        new ENSlashMonthFormatParser(),
+        new ENTimeExpressionParser(strictMode),
+        new ENTimeUnitAgoFormatParser(strictMode),
+        new ENTimeUnitLaterFormatParser(strictMode)
+      ],
+      refiners: [new ENMergeDateTimeRefiner()]
+    }, strictMode);
+    options.parsers.unshift(new ENYearMonthDayParser(strictMode));
+    options.refiners.unshift(new ENMergeRelativeFollowByDateRefiner());
+    options.refiners.unshift(new ENMergeRelativeAfterDateRefiner());
+    options.refiners.unshift(new OverlapRemovalRefiner());
+    options.refiners.push(new ENMergeDateTimeRefiner());
+    options.refiners.push(new ENExtractYearSuffixRefiner());
+    options.refiners.push(new ENMergeDateRangeRefiner());
+    return options;
+  }
+};
+
+// node_modules/chrono-node/dist/esm/chrono.js
+var Chrono = class _Chrono {
+  parsers;
+  refiners;
+  defaultConfig = new ENDefaultConfiguration();
+  constructor(configuration2) {
+    configuration2 = configuration2 || this.defaultConfig.createCasualConfiguration();
+    this.parsers = [...configuration2.parsers];
+    this.refiners = [...configuration2.refiners];
+  }
+  clone() {
+    return new _Chrono({
+      parsers: [...this.parsers],
+      refiners: [...this.refiners]
+    });
+  }
+  parseDate(text, referenceDate, option) {
+    const results = this.parse(text, referenceDate, option);
+    return results.length > 0 ? results[0].start.date() : null;
+  }
+  parse(text, referenceDate, option) {
+    const context = new ParsingContext(text, referenceDate, option);
+    let results = [];
+    this.parsers.forEach((parser) => {
+      const parsedResults = _Chrono.executeParser(context, parser);
+      results = results.concat(parsedResults);
+    });
+    results.sort((a, b) => {
+      return a.index - b.index;
+    });
+    this.refiners.forEach(function(refiner) {
+      results = refiner.refine(context, results);
+    });
+    return results;
+  }
+  static executeParser(context, parser) {
+    const results = [];
+    const pattern = parser.pattern(context);
+    const originalText = context.text;
+    let remainingText = context.text;
+    let match = pattern.exec(remainingText);
+    while (match) {
+      const index = match.index + originalText.length - remainingText.length;
+      match.index = index;
+      const result = parser.extract(context, match);
+      if (!result) {
+        remainingText = originalText.substring(match.index + 1);
+        match = pattern.exec(remainingText);
+        continue;
+      }
+      let parsedResult = null;
+      if (result instanceof ParsingResult) {
+        parsedResult = result;
+      } else if (result instanceof ParsingComponents) {
+        parsedResult = context.createParsingResult(match.index, match[0]);
+        parsedResult.start = result;
+      } else {
+        parsedResult = context.createParsingResult(match.index, match[0], result);
+      }
+      const parsedIndex = parsedResult.index;
+      const parsedText = parsedResult.text;
+      context.debug(() => console.log(`${parser.constructor.name} extracted (at index=${parsedIndex}) '${parsedText}'`));
+      results.push(parsedResult);
+      remainingText = originalText.substring(parsedIndex + parsedText.length);
+      match = pattern.exec(remainingText);
+    }
+    return results;
+  }
+};
+var ParsingContext = class {
+  text;
+  option;
+  reference;
+  refDate;
+  constructor(text, refDate, option) {
+    this.text = text;
+    this.option = option ?? {};
+    this.reference = ReferenceWithTimezone.fromInput(refDate, this.option.timezones);
+    this.refDate = this.reference.instant;
+  }
+  createParsingComponents(components) {
+    if (components instanceof ParsingComponents) {
+      return components;
+    }
+    return new ParsingComponents(this.reference, components);
+  }
+  createParsingResult(index, textOrEndIndex, startComponents, endComponents) {
+    const text = typeof textOrEndIndex === "string" ? textOrEndIndex : this.text.substring(index, textOrEndIndex);
+    const start = startComponents ? this.createParsingComponents(startComponents) : null;
+    const end = endComponents ? this.createParsingComponents(endComponents) : null;
+    return new ParsingResult(this.reference, index, text, start, end);
+  }
+  debug(block) {
+    if (this.option.debug) {
+      if (this.option.debug instanceof Function) {
+        this.option.debug(block);
+      } else {
+        const handler = this.option.debug;
+        handler.debug(block);
+      }
+    }
+  }
+};
+
+// node_modules/chrono-node/dist/esm/locales/en/index.js
+var configuration = new ENDefaultConfiguration();
+var casual = new Chrono(configuration.createCasualConfiguration(false));
+var strict = new Chrono(configuration.createConfiguration(true, false));
+var GB = new Chrono(configuration.createCasualConfiguration(true));
+
+// node_modules/chrono-node/dist/esm/index.js
+var casual2 = casual;
+function parse(text, ref, option) {
+  return casual2.parse(text, ref, option);
+}
+
+// src/widgets/create-task.ts
+var CreateTaskWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    this.popover = null;
+    this.onDocClick = (e) => this.handleOutsideClick(e);
+    this.render();
+  }
+  render() {
+    this.bodyEl.empty();
+    const btn = this.bodyEl.createDiv({ cls: "iris-hp-create-task" });
+    const icon = btn.createDiv({ cls: "iris-hp-create-task-icon" });
+    (0, import_obsidian4.setIcon)(icon, "check-square");
+    btn.createDiv({ cls: "iris-hp-create-task-label", text: "Create task" });
+    btn.addEventListener("click", () => this.togglePopover());
+  }
+  togglePopover() {
+    if (this.popover) {
+      this.closePopover();
+      return;
+    }
+    this.openPopover();
+  }
+  openPopover() {
+    const pop = this.containerEl.createDiv({ cls: "iris-hp-task-popover" });
+    this.popover = pop;
+    const titleInput = this.addField(pop, "", "Task name\u2026");
+    const dueInput = this.addField(pop, "Due", "tomorrow 3pm, next Friday\u2026");
+    const btn = pop.createEl("button", { cls: "iris-hp-task-submit", text: "Create" });
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.submit(titleInput, dueInput);
+    });
+    pop.addEventListener("mousedown", (e) => e.stopPropagation());
+    pop.addEventListener("click", (e) => e.stopPropagation());
+    setTimeout(() => document.addEventListener("click", this.onDocClick), 0);
+    titleInput.focus();
+  }
+  addField(parent, label, placeholder) {
+    const row = parent.createDiv({ cls: "iris-hp-task-field" });
+    if (label) row.createEl("label", { text: label });
+    const input = row.createEl("input", { type: "text" });
+    if (placeholder) input.placeholder = placeholder;
+    return input;
+  }
+  async submit(titleInput, dueInput) {
+    const title = titleInput.value.trim();
+    if (!title) {
+      new import_obsidian4.Notice("Task title is required");
+      return;
+    }
+    const lines = ["---"];
+    const raw = dueInput.value.trim();
+    if (raw) {
+      const due = await this.parseDate(raw);
+      if (!due) {
+        new import_obsidian4.Notice("Couldn't understand that date");
+        return;
+      }
+      lines.push(`closes: ${due.date}`);
+      if (due.time) lines.push(`closeTime: "${due.time}"`);
+    }
+    lines.push(`displayTitle: "${title}"`);
+    lines.push("status: ", "---", "");
+    await this.ensureFolder();
+    const safeName = title.replace(/[\\/:*?"<>|]/g, "_");
+    let path = `${TASK_FOLDER}/${safeName}.md`;
+    if (this.app.vault.getAbstractFileByPath(path)) {
+      let i = 1;
+      while (this.app.vault.getAbstractFileByPath(`${TASK_FOLDER}/${safeName} ${i}.md`)) i++;
+      path = `${TASK_FOLDER}/${safeName} ${i}.md`;
+    }
+    await this.app.vault.create(path, lines.join("\n"));
+    new import_obsidian4.Notice(`Task "${title}" created`);
+    this.closePopover();
+  }
+  closePopover() {
+    document.removeEventListener("click", this.onDocClick);
+    if (this.popover) {
+      this.popover.remove();
+      this.popover = null;
+    }
+  }
+  handleOutsideClick(e) {
+    if (this.popover && !this.popover.contains(e.target)) {
+      this.closePopover();
+    }
+  }
+  async parseDate(input) {
+    const results = parse(input);
+    if (results.length > 0) {
+      const start = results[0].start;
+      const parsed = start.date();
+      let time = null;
+      if (start.isCertain("hour")) {
+        const hh = String(parsed.getHours()).padStart(2, "0");
+        const mm = String(parsed.getMinutes()).padStart(2, "0");
+        time = `${hh}:${mm}`;
+      }
+      return { date: formatDate(parsed), time };
+    }
+    const apiKey = getApiKey(this.app);
+    if (!apiKey) return null;
+    try {
+      const todayStr = formatDate(/* @__PURE__ */ new Date());
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 64,
+          messages: [{
+            role: "user",
+            content: `Today is ${todayStr}. Parse this into a date and optional time. Return ONLY valid JSON: {"date":"YYYY-MM-DD","time":"HH:mm"} or {"date":"YYYY-MM-DD","time":null}. Input: "${input}"`
+          }]
+        })
+      });
+      if (!res.ok) return null;
+      const body = await res.json();
+      const text = body?.content?.[0]?.text ?? "";
+      const match = text.match(/\{[^}]+\}/);
+      if (!match) return null;
+      const obj = JSON.parse(match[0]);
+      if (!obj.date || !/^\d{4}-\d{2}-\d{2}$/.test(obj.date)) return null;
+      return { date: obj.date, time: obj.time || null };
+    } catch {
+      return null;
+    }
+  }
+  async ensureFolder() {
+    if (!this.app.vault.getAbstractFileByPath(TASK_FOLDER)) {
+      await this.app.vault.createFolder(TASK_FOLDER);
+    }
+  }
+  destroy() {
+    this.closePopover();
+    super.destroy();
+  }
+};
+
+// src/widgets/command.ts
+var import_obsidian5 = require("obsidian");
+var CommandSuggestModal = class extends import_obsidian5.FuzzySuggestModal {
+  constructor(app, commands, onChoose) {
+    super(app);
+    this.commands = commands;
+    this.onChoose = onChoose;
+  }
+  getItems() {
+    return this.commands;
+  }
+  getItemText(item) {
+    return item.name;
+  }
+  onChooseItem(item) {
+    this.onChoose(item);
+  }
+};
+var CommandWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    const configBtn = this.containerEl.createEl("button", {
+      cls: "iris-hp-widget-configure clickable-icon",
+      attr: { "aria-label": "Set command" }
+    });
+    (0, import_obsidian5.setIcon)(configBtn, "terminal");
+    configBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.openCommandPicker();
+    });
+    this.render();
+  }
+  render() {
+    this.bodyEl.empty();
+    if (!this.config.commandId) {
+      const placeholder = this.bodyEl.createDiv({ cls: "iris-hp-command" });
+      const icon2 = placeholder.createDiv({ cls: "iris-hp-command-icon" });
+      (0, import_obsidian5.setIcon)(icon2, "terminal");
+      placeholder.createDiv({ cls: "iris-hp-command-label", text: "No command set" });
+      return;
+    }
+    const cmd = this.getCommand(this.config.commandId);
+    const label = cmd?.name ?? this.config.commandId;
+    const btn = this.bodyEl.createDiv({
+      cls: "iris-hp-command",
+      attr: { "aria-label": label }
+    });
+    const icon = btn.createDiv({ cls: "iris-hp-command-icon" });
+    (0, import_obsidian5.setIcon)(icon, cmd?.icon ?? "terminal");
+    btn.createDiv({ cls: "iris-hp-command-label", text: label });
+    btn.addEventListener("click", () => {
+      this.app.commands.executeCommandById(this.config.commandId);
+    });
+  }
+  openCommandPicker() {
+    const commands = this.getAllCommands();
+    new CommandSuggestModal(this.app, commands, (cmd) => {
+      this.config.commandId = cmd.id;
+      this.plugin.saveSettings();
+      this.render();
+    }).open();
+  }
+  getAllCommands() {
+    const cmds = this.app.commands?.commands;
+    if (!cmds) return [];
+    return Object.values(cmds);
+  }
+  getCommand(id) {
+    const cmds = this.app.commands?.commands;
+    return cmds?.[id];
+  }
+};
+
+// src/widgets/quick-switcher.ts
+var import_obsidian6 = require("obsidian");
+var QuickSwitcherWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    this.searchTimer = null;
+    this.hiddenFilter = buildHiddenFilter(this.app);
+    this.render();
+  }
+  render() {
+    this.bodyEl.empty();
+    this.bodyEl.addClass("iris-hp-switcher-body");
+    const inputRow = this.bodyEl.createDiv({ cls: "iris-hp-switcher-input-row" });
+    const iconEl = inputRow.createDiv({ cls: "iris-hp-switcher-icon" });
+    (0, import_obsidian6.setIcon)(iconEl, "search");
+    const input = inputRow.createEl("input", {
+      cls: "iris-hp-switcher-input",
+      attr: { type: "text", placeholder: "Jump to note..." }
+    });
+    const results = this.bodyEl.createDiv({ cls: "iris-hp-switcher-results" });
+    input.addEventListener("input", () => {
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+      this.searchTimer = setTimeout(() => {
+        this.updateResults(input.value.trim(), results);
+      }, 120);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const first = results.querySelector(".iris-hp-switcher-item");
+        first?.click();
+      }
+    });
+  }
+  updateResults(query, container) {
+    container.empty();
+    if (!query) return;
+    const lower = query.toLowerCase();
+    const files = this.app.vault.getMarkdownFiles().filter((f) => !this.hiddenFilter(f.path) && f.basename.toLowerCase().includes(lower)).sort((a, b) => {
+      const aStarts = a.basename.toLowerCase().startsWith(lower) ? 0 : 1;
+      const bStarts = b.basename.toLowerCase().startsWith(lower) ? 0 : 1;
+      return aStarts - bStarts || a.basename.localeCompare(b.basename);
+    }).slice(0, 20);
+    for (const file of files) {
+      const item = container.createDiv({ cls: "iris-hp-switcher-item" });
+      item.createSpan({ text: getDisplayTitle(this.app, file) });
+      item.addEventListener("click", () => {
+        this.app.workspace.getLeaf(false).openFile(file);
+      });
+    }
+  }
+  destroy() {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    super.destroy();
+  }
+};
+
+// src/widgets/view-embed.ts
+var import_obsidian7 = require("obsidian");
+var ViewEmbedWidget = class extends BaseWidget {
+  constructor(app, containerEl, config, plugin) {
+    super(app, containerEl, config, plugin);
+    this.embeddedView = null;
+    this.resizeObserver = null;
+    this.render();
+  }
+  render() {
+    if (this.embeddedView) {
+      const currentType = this.embeddedView.getViewType();
+      if (currentType === this.config.type) {
+        if (!this.bodyEl.contains(this.embeddedView.containerEl)) {
+          this.bodyEl.empty();
+          this.bodyEl.addClass("iris-hp-view-embed-body");
+          this.bodyEl.appendChild(this.embeddedView.containerEl);
+        }
+        return;
+      }
+      this.cleanupView();
+    }
+    this.bodyEl.empty();
+    this.bodyEl.addClass("iris-hp-view-embed-body");
+    const loadingEl = this.bodyEl.createDiv({ cls: "iris-hp-view-embed-loading", text: "Loading..." });
+    this.embedView().then((success) => {
+      if (success) {
+        loadingEl.remove();
+      } else {
+        loadingEl.setText("Failed to load view");
+      }
+    });
+  }
+  async embedView() {
+    const registry = this.app.viewRegistry;
+    if (!registry) return false;
+    const viewCreator = registry.viewByType instanceof Map ? registry.viewByType.get(this.config.type) : registry.viewByType?.[this.config.type];
+    if (!viewCreator) return false;
+    const leaf = new import_obsidian7.WorkspaceLeaf(this.app);
+    const view = viewCreator(leaf);
+    leaf.view = view;
+    this.embeddedView = view;
+    this.bodyEl.appendChild(view.containerEl);
+    view.containerEl.addClass("iris-hp-embedded-leaf");
+    if (view.onOpen) {
+      await view.onOpen();
+    }
+    this.resizeObserver = new ResizeObserver(() => {
+      this.triggerResize(view);
+    });
+    this.resizeObserver.observe(this.bodyEl);
+    return true;
+  }
+  triggerResize(view) {
+    const v = view;
+    if (typeof v.onResize === "function") {
+      v.onResize();
+    }
+    if (v.renderer) {
+      if (typeof v.renderer.onResize === "function") {
+        v.renderer.onResize();
+      }
+      if (typeof v.renderer.start === "function" && !v.renderer._running) {
+        v.renderer.start();
+      }
+      if (typeof v.renderer.render === "function") {
+        v.renderer.render();
+      }
+    }
+  }
+  cleanupView() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.embeddedView) {
+      try {
+        if (this.embeddedView.onClose) {
+          this.embeddedView.onClose();
+        }
+      } catch {
+      }
+      this.embeddedView.containerEl.remove();
+      this.embeddedView = null;
+    }
+  }
+  destroy() {
+    this.cleanupView();
+    super.destroy();
+  }
+};
+
+// src/widget-picker.ts
+var import_obsidian8 = require("obsidian");
+var WidgetPickerModal = class extends import_obsidian8.Modal {
+  constructor() {
+    super(...arguments);
+    this.resolve = null;
+    this.entries = [];
+    this.filteredEntries = [];
+    this.gridEl = null;
+  }
+  open() {
+    this.entries = this.buildEntries();
+    this.filteredEntries = this.entries;
+    super.open();
+    return new Promise((resolve) => {
+      this.resolve = resolve;
+    });
+  }
+  onOpen() {
+    const { contentEl, modalEl } = this;
+    modalEl.addClass("iris-hp-picker-modal");
+    contentEl.empty();
+    contentEl.createEl("h2", { cls: "iris-hp-picker-title", text: "Add Widget" });
+    const searchInput = contentEl.createEl("input", {
+      cls: "iris-hp-picker-search",
+      attr: { type: "text", placeholder: "Search views..." }
+    });
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.toLowerCase().trim();
+      this.filteredEntries = query ? this.entries.filter((e) => e.label.toLowerCase().includes(query) || e.type.toLowerCase().includes(query)) : this.entries;
+      this.renderGrid();
+    });
+    this.gridEl = contentEl.createDiv({ cls: "iris-hp-picker-grid" });
+    this.renderGrid();
+    searchInput.focus();
+  }
+  onClose() {
+    if (this.resolve) {
+      this.resolve(null);
+      this.resolve = null;
+    }
+  }
+  renderGrid() {
+    if (!this.gridEl) return;
+    this.gridEl.empty();
+    const groups = [
+      { label: "Home", entries: this.filteredEntries.filter((e) => e.group === "homepage") },
+      { label: "Core", entries: this.filteredEntries.filter((e) => e.group === "core") },
+      { label: "Plugins", entries: this.filteredEntries.filter((e) => e.group === "plugin") }
+    ];
+    for (const group of groups) {
+      if (group.entries.length === 0) continue;
+      this.gridEl.createEl("h3", { cls: "iris-hp-picker-group-label", text: group.label });
+      const sectionEl = this.gridEl.createDiv({ cls: "iris-hp-picker-section" });
+      for (const entry of group.entries) {
+        const card = sectionEl.createDiv({ cls: "iris-hp-picker-card" });
+        const iconEl = card.createDiv({ cls: "iris-hp-picker-card-icon" });
+        (0, import_obsidian8.setIcon)(iconEl, entry.icon);
+        card.createDiv({ cls: "iris-hp-picker-card-label", text: entry.label });
+        card.addEventListener("click", () => {
+          if (this.resolve) {
+            this.resolve({ type: entry.type, width: entry.width, height: entry.height });
+            this.resolve = null;
+          }
+          this.close();
+        });
+      }
+    }
+    if (this.filteredEntries.length === 0) {
+      this.gridEl.createDiv({ cls: "iris-hp-picker-empty", text: "No matching views" });
+    }
+  }
+  buildEntries() {
+    const entries = [];
+    for (const [type, meta] of Object.entries(BUILTIN_WIDGETS)) {
+      entries.push({
+        type,
+        label: meta.label,
+        icon: meta.icon,
+        group: "homepage",
+        width: meta.width,
+        height: meta.height
+      });
+    }
+    const registry = this.app.viewRegistry;
+    if (registry && registry.viewByType) {
+      const viewByType = registry.viewByType instanceof Map ? registry.viewByType : new Map(Object.entries(registry.viewByType));
+      for (const viewType of viewByType.keys()) {
+        if (HIDDEN_VIEW_TYPES.has(viewType)) continue;
+        if (Object.prototype.hasOwnProperty.call(BUILTIN_WIDGETS, viewType)) continue;
+        entries.push({
+          type: viewType,
+          label: humanizeViewType(viewType),
+          icon: VIEW_TYPE_ICON_MAP[viewType] || "box",
+          group: CORE_VIEW_TYPES.has(viewType) ? "core" : "plugin",
+          width: 2,
+          height: 3
+        });
+      }
+    }
+    return entries;
+  }
+};
+
+// src/homepage-view.ts
+var EMPTY_DRAG_IMG = new Image();
+EMPTY_DRAG_IMG.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+var HomepageView = class extends import_obsidian9.ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.widgetInstances = /* @__PURE__ */ new Map();
+    this.editMode = false;
+    this.draggedWidgetId = null;
+    this.dragOffsetCol = 0;
+    this.dragOffsetRow = 0;
+    this.gridEl = null;
+    this.ghostEl = null;
+    this.pendingWidget = null;
+    this.placingCleanup = null;
+    this.plugin = plugin;
+    this.engine = new GridEngine(plugin.settings.columns);
+  }
+  getViewType() {
+    return VIEW_TYPE_HOMEPAGE;
+  }
+  getDisplayText() {
+    return "Home";
+  }
+  getIcon() {
+    return "home";
+  }
+  async onOpen() {
+    this.render();
+  }
+  async onClose() {
+    this.widgetInstances.forEach((w) => w.destroy());
+    this.widgetInstances.clear();
+  }
+  render() {
+    if (this.placingCleanup) this.placingCleanup();
+    this.engine.setColumns(this.plugin.settings.columns);
+    this.widgetInstances.forEach((w) => w.destroy());
+    this.widgetInstances.clear();
+    const root = this.contentEl;
+    root.empty();
+    root.addClass("iris-hp-root");
+    root.toggleClass("iris-hp-edit-mode", this.editMode);
+    root.toggleClass("iris-hp-borderless", this.plugin.settings.borderless);
+    const gridEl = root.createDiv({ cls: "iris-hp-grid" });
+    this.gridEl = gridEl;
+    gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
+    gridEl.style.gridAutoRows = `${ROW_HEIGHT}px`;
+    gridEl.style.gap = `${GRID_GAP}px`;
+    for (const config of this.plugin.settings.widgets) {
+      this.renderWidget(gridEl, config);
+    }
+    if (this.plugin.settings.widgets.length === 0) {
+      const hint = root.createDiv({ cls: "iris-hp-empty-state" });
+      const icon = hint.createDiv({ cls: "iris-hp-empty-state-icon" });
+      (0, import_obsidian9.setIcon)(icon, "pencil");
+      hint.createEl("span", { text: "Click the pencil to get started" });
+    }
+    if (this.editMode) {
+      const cols = this.plugin.settings.columns;
+      const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
+      const rootStyle = getComputedStyle(this.contentEl);
+      const rootPadding = parseFloat(rootStyle.paddingTop) + parseFloat(rootStyle.paddingBottom);
+      const viewportRows = Math.floor((this.contentEl.clientHeight - rootPadding) / (ROW_HEIGHT + GRID_GAP));
+      const rows = Math.max(maxRow + 2, viewportRows);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });
+          dot.style.gridColumn = `${c + 1}`;
+          dot.style.gridRow = `${r + 1}`;
+        }
+      }
+    }
+    this.attachGridListeners(gridEl);
+    this.renderToolbar(root);
+  }
+  renderToolbar(root) {
+    const toolbar = root.createDiv({ cls: "iris-hp-toolbar" });
+    const editBtn = toolbar.createEl("button", {
+      cls: "iris-hp-toolbar-btn clickable-icon",
+      attr: { "aria-label": this.editMode ? "Done editing" : "Edit layout" }
+    });
+    (0, import_obsidian9.setIcon)(editBtn, this.editMode ? "check" : "pencil");
+    editBtn.addEventListener("click", () => {
+      this.editMode = !this.editMode;
+      this.render();
+    });
+    if (this.editMode) {
+      const addBtn = toolbar.createEl("button", {
+        cls: "iris-hp-toolbar-btn clickable-icon",
+        attr: { "aria-label": "Add widget" }
+      });
+      (0, import_obsidian9.setIcon)(addBtn, "plus");
+      addBtn.addEventListener("click", () => this.openPickerThenPlace());
+      const trash = root.createDiv({ cls: "iris-hp-trash-zone" });
+      (0, import_obsidian9.setIcon)(trash, "trash-2");
+      trash.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        trash.addClass("iris-hp-trash-hover");
+      });
+      trash.addEventListener("dragleave", () => {
+        trash.removeClass("iris-hp-trash-hover");
+      });
+      trash.addEventListener("drop", (e) => {
+        e.preventDefault();
+        trash.removeClass("iris-hp-trash-hover");
+        if (!this.draggedWidgetId || !this.gridEl) return;
+        const widgetId = this.draggedWidgetId;
+        const gridEl = this.gridEl;
+        this.draggedWidgetId = null;
+        const deleteWidget = () => {
+          const idx = this.plugin.settings.widgets.findIndex((w) => w.id === widgetId);
+          if (idx === -1) return;
+          const oldPositions = this.snapshotPositions(gridEl);
+          this.plugin.settings.widgets.splice(idx, 1);
+          this.engine.compact(this.plugin.settings.widgets);
+          this.animateReflow(gridEl, oldPositions);
+          this.plugin.saveData(this.plugin.settings);
+        };
+        const wrapper = gridEl.querySelector(
+          `.iris-hp-widget-wrapper[data-widget-id="${widgetId}"]`
+        );
+        if (wrapper) {
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const trashRect = trash.getBoundingClientRect();
+          const dx = trashRect.left + trashRect.width / 2 - (wrapperRect.left + wrapperRect.width / 2);
+          const dy = trashRect.top + trashRect.height / 2 - (wrapperRect.top + wrapperRect.height / 2);
+          wrapper.style.transition = "transform 0.25s ease, opacity 0.25s ease";
+          wrapper.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+          wrapper.style.opacity = "0";
+          wrapper.style.zIndex = "200";
+          let deleted = false;
+          const doDelete = () => {
+            if (!deleted) {
+              deleted = true;
+              wrapper.remove();
+              deleteWidget();
+            }
+          };
+          wrapper.addEventListener("transitionend", doDelete, { once: true });
+          setTimeout(doDelete, 350);
+        } else {
+          deleteWidget();
+        }
+      });
+    }
+  }
+  async openPickerThenPlace() {
+    const modal = new WidgetPickerModal(this.app);
+    const result = await modal.open();
+    if (!result || !this.gridEl) return;
+    this.enterPlacingMode(result);
+  }
+  async openPickerAt(col, row) {
+    const modal = new WidgetPickerModal(this.app);
+    const result = await modal.open();
+    if (!result) return;
+    this.addWidgetAt(result, col, row);
+  }
+  enterPlacingMode(result) {
+    this.pendingWidget = result;
+    this.contentEl.addClass("iris-hp-placing");
+    const gridEl = this.gridEl;
+    const onMouseMove = (e) => {
+      const cell = this.getCellFromEvent(gridEl, e);
+      if (!cell) return;
+      if (!this.ghostEl) {
+        this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
+      }
+      const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - result.width));
+      const row = Math.max(0, cell.row);
+      this.setGridPos(this.ghostEl, col, row, result.width, result.height);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup();
+      }
+    };
+    const cleanup = () => {
+      this.pendingWidget = null;
+      this.contentEl.removeClass("iris-hp-placing");
+      this.removeGhost();
+      gridEl.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("keydown", onKeyDown);
+      this.placingCleanup = null;
+    };
+    this.placingCleanup = cleanup;
+    gridEl.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("keydown", onKeyDown);
+  }
+  renderWidget(gridEl, config) {
+    const wrapper = gridEl.createDiv({ cls: "iris-hp-widget-wrapper" });
+    wrapper.dataset.widgetId = config.id;
+    wrapper.setAttribute("draggable", "true");
+    this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
+    let widget;
+    if (isBuiltinWidget(config.type)) {
+      switch (config.type) {
+        case "recent-notes":
+          widget = new RecentNotesWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "embedded-note":
+          widget = new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "new-note":
+          widget = new NewNoteWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "create-task":
+          widget = new CreateTaskWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "command":
+          widget = new CommandWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "quick-switcher":
+          widget = new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
+          break;
+        case "iris-tasks-view":
+          widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
+          break;
+      }
+    } else {
+      widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
+    }
+    this.widgetInstances.set(config.id, widget);
+  }
+  addWidgetAt(result, col, row) {
+    const { width, height } = result;
+    const clampedCol = Math.max(0, Math.min(col, this.plugin.settings.columns - width));
+    const clampedRow = Math.max(0, row);
+    const config = {
+      id: crypto.randomUUID(),
+      type: result.type,
+      col: clampedCol,
+      row: clampedRow,
+      width,
+      height
+    };
+    this.plugin.settings.widgets.push(config);
+    this.engine.resolveCollisions(this.plugin.settings.widgets, config);
+    this.plugin.saveSettings();
+    this.render();
+  }
+  attachGridListeners(gridEl) {
+    gridEl.addEventListener("dragstart", (e) => {
+      if (!this.editMode) {
+        e.preventDefault();
+        return;
+      }
+      const wrapper = e.target.closest(".iris-hp-widget-wrapper");
+      if (!wrapper) return;
+      this.draggedWidgetId = wrapper.dataset.widgetId || null;
+      if (this.draggedWidgetId && e.dataTransfer) {
+        const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
+        const cell = this.getCellFromEvent(gridEl, e);
+        if (widget && cell) {
+          this.dragOffsetCol = cell.col - widget.col;
+          this.dragOffsetRow = cell.row - widget.row;
+        } else {
+          this.dragOffsetCol = 0;
+          this.dragOffsetRow = 0;
+        }
+        e.dataTransfer.setData("text/plain", this.draggedWidgetId);
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setDragImage(EMPTY_DRAG_IMG, 0, 0);
+        wrapper.addClass("iris-hp-dragging");
+      }
+    });
+    gridEl.addEventListener("dragover", (e) => {
+      if (!this.editMode || !this.draggedWidgetId) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      this.updateGhost(gridEl, e);
+    });
+    gridEl.addEventListener("dragleave", () => {
+      this.removeGhost();
+    });
+    gridEl.addEventListener("drop", (e) => {
+      e.preventDefault();
+      this.removeGhost();
+      if (!this.draggedWidgetId) return;
+      const cell = this.getCellFromEvent(gridEl, e);
+      if (!cell) return;
+      const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
+      if (!widget) return;
+      const oldPositions = this.snapshotPositions(gridEl);
+      widget.col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
+      widget.row = Math.max(0, cell.row - this.dragOffsetRow);
+      this.engine.clamp(widget);
+      this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
+      this.draggedWidgetId = null;
+      this.animateReflow(gridEl, oldPositions);
+      this.plugin.saveData(this.plugin.settings);
+    });
+    gridEl.addEventListener("dragend", () => {
+      this.draggedWidgetId = null;
+      this.removeGhost();
+      gridEl.querySelectorAll(".iris-hp-dragging").forEach((el) => el.removeClass("iris-hp-dragging"));
+    });
+    gridEl.addEventListener("click", (e) => {
+      if (!this.editMode) return;
+      if (e.target.closest(".iris-hp-widget-wrapper")) return;
+      const cell = this.getCellFromEvent(gridEl, e);
+      if (!cell) return;
+      if (this.pendingWidget) {
+        const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - this.pendingWidget.width));
+        const row = Math.max(0, cell.row);
+        const result = this.pendingWidget;
+        if (this.placingCleanup) this.placingCleanup();
+        this.addWidgetAt(result, col, row);
+        return;
+      }
+      const map = this.engine.buildOccupancyMap(this.plugin.settings.widgets);
+      const key = cell.row * 32 + cell.col;
+      if (map.has(key)) return;
+      this.openPickerAt(cell.col, cell.row);
+    });
+    gridEl.addEventListener("widget-resize-start", (e) => {
+      if (!this.editMode) return;
+      const { widgetId, corner, event: mouseEvent } = e.detail;
+      this.startResize(gridEl, widgetId, corner, mouseEvent);
+    });
+  }
+  startResize(gridEl, widgetId, corner, startEvent) {
+    const widget = this.plugin.settings.widgets.find((w) => w.id === widgetId);
+    if (!widget) return;
+    const gridRect = gridEl.getBoundingClientRect();
+    const { cellW, cellH } = this.getCellSize(gridRect);
+    const stepX = cellW + GRID_GAP;
+    const stepY = cellH + GRID_GAP;
+    const origCol = widget.col;
+    const origRow = widget.row;
+    const origWidth = widget.width;
+    const origHeight = widget.height;
+    const anchorRight = origCol + origWidth;
+    const anchorBottom = origRow + origHeight;
+    const ghost = gridEl.createDiv({ cls: "iris-hp-resize-ghost" });
+    this.setGridPos(ghost, widget.col, widget.row, widget.width, widget.height);
+    const cellFromEvent = (e) => ({
+      col: Math.floor((e.clientX - gridRect.left) / stepX),
+      row: Math.floor((e.clientY - gridRect.top) / stepY)
+    });
+    const computeRect = (e) => {
+      const end = cellFromEvent(e);
+      let col = origCol, row = origRow, w = origWidth, h = origHeight;
+      switch (corner) {
+        case "br":
+          w = Math.max(1, end.col - origCol + 1);
+          h = Math.max(1, end.row - origRow + 1);
+          break;
+        case "bl":
+          col = Math.max(0, Math.min(end.col, anchorRight - 1));
+          w = anchorRight - col;
+          h = Math.max(1, end.row - origRow + 1);
+          break;
+        case "tr":
+          w = Math.max(1, end.col - origCol + 1);
+          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
+          h = anchorBottom - row;
+          break;
+        case "tl":
+          col = Math.max(0, Math.min(end.col, anchorRight - 1));
+          w = anchorRight - col;
+          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
+          h = anchorBottom - row;
+          break;
+        case "r":
+          w = Math.max(1, end.col - origCol + 1);
+          break;
+        case "l":
+          col = Math.max(0, Math.min(end.col, anchorRight - 1));
+          w = anchorRight - col;
+          break;
+        case "b":
+          h = Math.max(1, end.row - origRow + 1);
+          break;
+        case "t":
+          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
+          h = anchorBottom - row;
+          break;
+      }
+      w = Math.min(w, this.plugin.settings.columns - col);
+      return { col, row, w, h };
+    };
+    const onMouseMove = (e) => {
+      const r = computeRect(e);
+      this.setGridPos(ghost, r.col, r.row, r.w, r.h);
+    };
+    const onMouseUp = (e) => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      ghost.remove();
+      const r = computeRect(e);
+      widget.col = r.col;
+      widget.row = r.row;
+      widget.width = r.w;
+      widget.height = r.h;
+      if (widget.width !== origWidth || widget.height !== origHeight || widget.col !== origCol || widget.row !== origRow) {
+        const oldPositions = this.snapshotPositions(gridEl);
+        this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
+        this.animateReflow(gridEl, oldPositions);
+        this.plugin.saveData(this.plugin.settings);
+      }
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }
+  updateGhost(gridEl, e) {
+    const cell = this.getCellFromEvent(gridEl, e);
+    if (!cell) return;
+    const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
+    if (!widget) return;
+    if (!this.ghostEl) {
+      this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
+    }
+    const col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
+    const row = Math.max(0, cell.row - this.dragOffsetRow);
+    this.setGridPos(this.ghostEl, col, row, widget.width, widget.height);
+  }
+  setGridPos(el, col, row, w, h) {
+    el.style.gridColumn = `${col + 1} / span ${w}`;
+    el.style.gridRow = `${row + 1} / span ${h}`;
+  }
+  removeGhost() {
+    if (this.ghostEl) {
+      this.ghostEl.remove();
+      this.ghostEl = null;
+    }
+  }
+  getCellSize(gridRect) {
+    return {
+      cellW: (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns,
+      cellH: ROW_HEIGHT
+    };
+  }
+  getCellFromEvent(gridEl, e) {
+    const gridRect = gridEl.getBoundingClientRect();
+    const { cellW, cellH } = this.getCellSize(gridRect);
+    const relX = e.clientX - gridRect.left;
+    const relY = e.clientY - gridRect.top;
+    return this.engine.pixelToCell(relX, relY, cellW + GRID_GAP, cellH + GRID_GAP);
+  }
+  /** Snapshot bounding rects for all widget wrappers keyed by widget ID. */
+  snapshotPositions(gridEl) {
+    const positions = /* @__PURE__ */ new Map();
+    gridEl.querySelectorAll(".iris-hp-widget-wrapper").forEach((el) => {
+      const id = el.dataset.widgetId;
+      if (id) positions.set(id, el.getBoundingClientRect());
+    });
+    return positions;
+  }
+  /** Apply new grid placements and FLIP-animate from old positions. */
+  animateReflow(gridEl, oldPositions) {
+    for (const config of this.plugin.settings.widgets) {
+      const wrapper = gridEl.querySelector(
+        `.iris-hp-widget-wrapper[data-widget-id="${config.id}"]`
+      );
+      if (!wrapper) continue;
+      this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
+    }
+    gridEl.offsetHeight;
+    gridEl.querySelectorAll(".iris-hp-widget-wrapper").forEach((el) => {
+      const id = el.dataset.widgetId;
+      if (!id) return;
+      const oldRect = oldPositions.get(id);
+      if (!oldRect) return;
+      const newRect = el.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left;
+      const dy = oldRect.top - newRect.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.25s ease";
+        el.style.transform = "";
+      });
+    });
+  }
+};
+
+// src/settings.ts
+var import_obsidian10 = require("obsidian");
+var IrisHomepageSettingsTab = class extends import_obsidian10.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "General" });
+    new import_obsidian10.Setting(containerEl).setName("Grid columns").setDesc("Number of columns in the widget grid (2-16)").addDropdown((drop) => {
+      for (let i = 2; i <= 16; i++) {
+        drop.addOption(String(i * 2), String(i));
+      }
+      drop.setValue(String(this.plugin.settings.columns));
+      drop.onChange(async (val) => {
+        this.plugin.settings.columns = parseInt(val, 10);
+        await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian10.Setting(containerEl).setName("Open on startup").setDesc("Show the homepage when Obsidian starts").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.openOnStartup).onChange(async (val) => {
+        this.plugin.settings.openOnStartup = val;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian10.Setting(containerEl).setName("Replace new tabs").setDesc("Open the homepage instead of an empty new tab").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.replaceNewTab).onChange(async (val) => {
+        this.plugin.settings.replaceNewTab = val;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian10.Setting(containerEl).setName("Borderless widgets").setDesc("Remove borders and backgrounds from widget cards").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.borderless).onChange(async (val) => {
+        this.plugin.settings.borderless = val;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h2", { text: "AI" });
+    const apiKeySetting = new import_obsidian10.Setting(containerEl).setName("Anthropic API key").setDesc("Used as a fallback for natural language date parsing when chrono-node can't interpret the input");
+    const existingKey = getApiKey(this.app);
+    apiKeySetting.addText((text) => {
+      text.setPlaceholder(existingKey ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "sk-ant-\u2026").onChange(() => {
+      });
+      const inputEl = text.inputEl;
+      inputEl.type = "password";
+      inputEl.style.width = "220px";
+      apiKeySetting.addButton(
+        (btn) => btn.setButtonText("Save").onClick(async () => {
+          const val = inputEl.value.trim();
+          if (val) {
+            setApiKey(this.app, val);
+            inputEl.value = "";
+            inputEl.placeholder = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+          }
+        })
+      );
+      if (existingKey) {
+        apiKeySetting.addButton(
+          (btn) => btn.setButtonText("Clear").setWarning().onClick(async () => {
+            setApiKey(this.app, "");
+            inputEl.placeholder = "sk-ant-\u2026";
+            inputEl.value = "";
+          })
+        );
+      }
+    });
+    containerEl.createEl("h2", { text: "Widgets" });
+    for (let i = 0; i < this.plugin.settings.widgets.length; i++) {
+      const config = this.plugin.settings.widgets[i];
+      const label = resolveWidgetLabel(config.type);
+      new import_obsidian10.Setting(containerEl).setName(label).setDesc(`Position: col ${config.col + 1}, row ${config.row + 1} | Size: ${config.width}x${config.height}`).addButton(
+        (btn) => btn.setButtonText("Remove").setWarning().onClick(async () => {
+          this.plugin.settings.widgets.splice(i, 1);
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+      if (config.type === "command" && config.commandId) {
+        const cmd = this.app.commands?.commands?.[config.commandId];
+        new import_obsidian10.Setting(containerEl).setClass("iris-hp-setting-indent").setName("Command").setDesc(cmd?.name ?? config.commandId);
+      }
+      if (config.type === "embedded-note") {
+        new import_obsidian10.Setting(containerEl).setClass("iris-hp-setting-indent").setName("Note path").setDesc("Path to the note to embed").addText(
+          (text) => text.setPlaceholder("path/to/note.md").setValue(config.notePath ?? "").onChange(async (val) => {
+            config.notePath = val.trim();
+            await this.plugin.saveSettings();
+          })
+        );
+      }
+    }
+  }
+};
+
+// src/main.ts
+var IrisHomepagePlugin = class extends import_obsidian11.Plugin {
+  constructor() {
+    super(...arguments);
+    this.settings = DEFAULT_SETTINGS;
+    this.isReplacingTab = false;
+    this.hideEmptyStyleEl = null;
+  }
+  async onload() {
+    await this.loadSettings();
+    this.registerView(VIEW_TYPE_HOMEPAGE, (leaf) => new HomepageView(leaf, this));
+    this.addCommand({
+      id: "open-homepage",
+      name: "Open home",
+      callback: () => this.activateView()
+    });
+    this.addSettingTab(new IrisHomepageSettingsTab(this.app, this));
+    this.updateEmptyTabVisibility();
+    this.app.workspace.onLayoutReady(() => {
+      if (this.settings.openOnStartup) {
+        this.replaceEmptyTabs();
+      }
+    });
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        if (this.settings.replaceNewTab) {
+          this.replaceEmptyTabs();
+        }
+      })
+    );
+  }
+  async onunload() {
+    if (this.hideEmptyStyleEl) {
+      this.hideEmptyStyleEl.remove();
+      this.hideEmptyStyleEl = null;
+    }
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_HOMEPAGE);
+  }
+  async loadSettings() {
+    const data = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+    if (!this.settings.gridVersion || this.settings.gridVersion < 2) {
+      for (const w of this.settings.widgets) {
+        w.height *= 2;
+        w.row *= 2;
+      }
+      this.settings.gridVersion = 2;
+    }
+    if (this.settings.gridVersion < 3) {
+      this.settings.columns *= 2;
+      for (const w of this.settings.widgets) {
+        w.width *= 2;
+        w.col *= 2;
+      }
+      this.settings.gridVersion = 3;
+    }
+    if (!data?.gridVersion || data.gridVersion < 3) {
+      await this.saveData(this.settings);
+    }
+  }
+  async saveSettings() {
+    await this.saveData(this.settings);
+    this.updateEmptyTabVisibility();
+    this.refreshViews();
+  }
+  refreshViews() {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_HOMEPAGE)) {
+      const view = leaf.view;
+      view.render();
+    }
+  }
+  async activateView() {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_HOMEPAGE);
+    if (existing.length > 0) {
+      this.app.workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.setViewState({ type: VIEW_TYPE_HOMEPAGE, active: true });
+    this.app.workspace.revealLeaf(leaf);
+  }
+  updateEmptyTabVisibility() {
+    if (this.settings.replaceNewTab && !this.hideEmptyStyleEl) {
+      this.hideEmptyStyleEl = document.createElement("style");
+      this.hideEmptyStyleEl.textContent = `.workspace-leaf-content[data-type="empty"] { display: none !important; }`;
+      document.head.appendChild(this.hideEmptyStyleEl);
+    } else if (!this.settings.replaceNewTab && this.hideEmptyStyleEl) {
+      this.hideEmptyStyleEl.remove();
+      this.hideEmptyStyleEl = null;
+    }
+  }
+  replaceEmptyTabs() {
+    if (this.isReplacingTab) return;
+    this.isReplacingTab = true;
+    try {
+      const emptyLeaves = this.app.workspace.getLeavesOfType("empty");
+      for (const leaf of emptyLeaves) {
+        leaf.setViewState({ type: VIEW_TYPE_HOMEPAGE, active: true });
+      }
+    } finally {
+      this.isReplacingTab = false;
+    }
+  }
+};

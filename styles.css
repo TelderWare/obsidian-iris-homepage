@@ -109,6 +109,7 @@
 .iris-hp-widget-wrapper {
   position: relative;
   transition: transform 0.25s ease;
+  z-index: 1;
 }
 
 .iris-hp-widget {
@@ -139,15 +140,21 @@
   cursor: grabbing;
 }
 
+/* ─── Placement mode ─── */
+.iris-hp-placing .iris-hp-grid {
+  cursor: crosshair;
+}
+
 .iris-hp-widget-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.85em;
-  font-weight: 600;
+  margin: 0 0 4px 0;
+  font-size: 0.75em;
+  font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
 .iris-hp-widget-icon {
@@ -234,6 +241,15 @@
   display: none;
 }
 
+.iris-hp-widget-body *,
+.iris-hp-widget-body {
+  scrollbar-width: none;
+}
+
+.iris-hp-widget-body *::-webkit-scrollbar {
+  display: none;
+}
+
 .iris-hp-empty {
   color: var(--text-faint);
   font-size: 0.9em;
@@ -286,43 +302,41 @@
   box-shadow: none;
 }
 
-/* ─── Widget title ─── */
-.iris-hp-widget-title {
-  margin: 0 0 4px 0;
-  font-size: 0.75em;
-  font-weight: 500;
-  color: var(--text-muted);
-  letter-spacing: 0.03em;
-}
-
-/* ─── List widgets (recent notes) ─── */
-.iris-hp-recent-list {
-  list-style: none;
+/* ─── Shared list styles (recent notes, tasks, etc.) ─── */
+.iris-hp-list {
   padding: 0;
   margin: 0;
 }
 
-.iris-hp-recent-item {
+.iris-hp-list-item-self {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 4px 8px;
   border-radius: var(--radius-s);
   cursor: pointer;
   transition: background 0.1s ease;
 }
 
-.iris-hp-recent-item:hover {
+.iris-hp-list-item-self:hover {
   background: var(--background-modifier-hover);
 }
 
-.iris-hp-recent-name {
+.iris-hp-list-item-inner {
   flex: 1;
+  min-width: 0;
   font-size: 0.9em;
   color: var(--text-normal);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.iris-hp-list-item-flair {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.75em;
+  color: var(--text-faint);
 }
 
 /* ─── Embedded note widget ─── */

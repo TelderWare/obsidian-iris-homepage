@@ -29,6 +29,8 @@ export class HomepageView extends ItemView {
   private dragOffsetRow = 0;
   private gridEl: HTMLElement | null = null;
   private ghostEl: HTMLElement | null = null;
+  private pendingWidget: PickerResult | null = null;
+  private placingCleanup: (() => void) | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: IrisHomepagePlugin) {
     super(leaf);
@@ -58,6 +60,7 @@ export class HomepageView extends ItemView {
   }
 
   render(): void {
+    if (this.placingCleanup) this.placingCleanup();
     this.engine.setColumns(this.plugin.settings.columns);
     this.widgetInstances.forEach((w) => w.destroy());
     this.widgetInstances.clear();
@@ -125,7 +128,7 @@ export class HomepageView extends ItemView {
         attr: { "aria-label": "Add widget" },
       });
       setIcon(addBtn, "plus");
-      addBtn.addEventListener("click", () => this.openPicker());
+      addBtn.addEventListener("click", () => this.openPickerThenPlace());
 
       // Trash drop zone
       const trash = root.createDiv({ cls: "iris-hp-trash-zone" });
@@ -186,11 +189,58 @@ export class HomepageView extends ItemView {
     }
   }
 
-  private async openPicker(): Promise<void> {
+  private async openPickerThenPlace(): Promise<void> {
+    const modal = new WidgetPickerModal(this.app);
+    const result = await modal.open();
+    if (!result || !this.gridEl) return;
+    this.enterPlacingMode(result);
+  }
+
+  private async openPickerAt(col: number, row: number): Promise<void> {
     const modal = new WidgetPickerModal(this.app);
     const result = await modal.open();
     if (!result) return;
-    this.addWidget(result);
+    this.addWidgetAt(result, col, row);
+  }
+
+  private enterPlacingMode(result: PickerResult): void {
+    this.pendingWidget = result;
+    this.contentEl.addClass("iris-hp-placing");
+
+    const gridEl = this.gridEl!;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const cell = this.getCellFromEvent(gridEl, e);
+      if (!cell) return;
+
+      if (!this.ghostEl) {
+        this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
+      }
+
+      const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - result.width));
+      const row = Math.max(0, cell.row);
+      this.setGridPos(this.ghostEl, col, row, result.width, result.height);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup();
+      }
+    };
+
+    const cleanup = () => {
+      this.pendingWidget = null;
+      this.contentEl.removeClass("iris-hp-placing");
+      this.removeGhost();
+      gridEl.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("keydown", onKeyDown);
+      this.placingCleanup = null;
+    };
+
+    this.placingCleanup = cleanup;
+    gridEl.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("keydown", onKeyDown);
   }
 
   private renderWidget(gridEl: HTMLElement, config: WidgetConfig): void {
@@ -221,6 +271,9 @@ export class HomepageView extends ItemView {
         case "quick-switcher":
           widget = new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
           break;
+        case "iris-tasks-view":
+          widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
+          break;
       }
     } else {
       widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
@@ -229,22 +282,24 @@ export class HomepageView extends ItemView {
     this.widgetInstances.set(config.id, widget);
   }
 
-  private addWidget(result: PickerResult): void {
+  private addWidgetAt(result: PickerResult, col: number, row: number): void {
     const { width, height } = result;
-    const pos = this.engine.findFirstAvailable(this.plugin.settings.widgets, width, height);
+    const clampedCol = Math.max(0, Math.min(col, this.plugin.settings.columns - width));
+    const clampedRow = Math.max(0, row);
 
     const config: WidgetConfig = {
       id: crypto.randomUUID(),
       type: result.type,
-      col: pos.col,
-      row: pos.row,
+      col: clampedCol,
+      row: clampedRow,
       width,
       height,
     };
 
     this.plugin.settings.widgets.push(config);
-    this.engine.compact(this.plugin.settings.widgets);
+    this.engine.resolveCollisions(this.plugin.settings.widgets, config);
     this.plugin.saveSettings();
+    this.render();
   }
 
   private attachGridListeners(gridEl: HTMLElement): void {
@@ -311,6 +366,31 @@ export class HomepageView extends ItemView {
       this.draggedWidgetId = null;
       this.removeGhost();
       gridEl.querySelectorAll(".iris-hp-dragging").forEach((el) => el.removeClass("iris-hp-dragging"));
+    });
+
+    gridEl.addEventListener("click", (e) => {
+      if (!this.editMode) return;
+      // Ignore clicks on widget wrappers (they handle their own clicks)
+      if ((e.target as HTMLElement).closest(".iris-hp-widget-wrapper")) return;
+
+      const cell = this.getCellFromEvent(gridEl, e);
+      if (!cell) return;
+
+      if (this.pendingWidget) {
+        const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - this.pendingWidget.width));
+        const row = Math.max(0, cell.row);
+        const result = this.pendingWidget;
+        if (this.placingCleanup) this.placingCleanup();
+        this.addWidgetAt(result, col, row);
+        return;
+      }
+
+      // Check if cell is occupied
+      const map = this.engine.buildOccupancyMap(this.plugin.settings.widgets);
+      const key = cell.row * 32 + cell.col;
+      if (map.has(key)) return;
+
+      this.openPickerAt(cell.col, cell.row);
     });
 
     gridEl.addEventListener("widget-resize-start", ((e: CustomEvent) => {

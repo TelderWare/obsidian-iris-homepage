@@ -50,13 +50,15 @@ export class RecentNotesWidget extends BaseWidget {
     }
 
     this.bodyEl.createEl("h6", { cls: "iris-hp-widget-title", text: "Recent notes" });
-    const listEl = this.bodyEl.createEl("ul", { cls: "iris-hp-recent-list" });
+    const listEl = this.bodyEl.createDiv({ cls: "iris-hp-list" });
 
     for (const file of displayed) {
-      const li = listEl.createEl("li", { cls: "iris-hp-recent-item" });
-      li.createSpan({ cls: "iris-hp-recent-name", text: getDisplayTitle(this.app, file) });
+      const item = listEl.createDiv({ cls: "iris-hp-list-item" });
+      const self = item.createDiv({ cls: "iris-hp-list-item-self is-clickable" });
+      const inner = self.createDiv({ cls: "iris-hp-list-item-inner" });
+      inner.setText(getDisplayTitle(this.app, file));
 
-      li.addEventListener("click", () => {
+      self.addEventListener("click", () => {
         this.app.workspace.getLeaf(false).openFile(file);
       });
     }
