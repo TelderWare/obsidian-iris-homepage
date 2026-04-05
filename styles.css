@@ -6,6 +6,32 @@
   overflow-y: auto;
 }
 
+/* ─── Empty state ─── */
+.iris-hp-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-faint);
+  font-size: 0.9em;
+  pointer-events: none;
+}
+
+.iris-hp-empty-state-icon {
+  display: flex;
+}
+
+.iris-hp-empty-state-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.iris-hp-edit-mode .iris-hp-empty-state {
+  display: none;
+}
+
 /* ─── Toolbar ─── */
 .iris-hp-toolbar {
   position: fixed;
@@ -260,16 +286,23 @@
   box-shadow: none;
 }
 
-/* ─── List widgets (recent notes, task list) ─── */
-.iris-hp-recent-list,
-.iris-hp-task-list {
+/* ─── Widget title ─── */
+.iris-hp-widget-title {
+  margin: 0 0 4px 0;
+  font-size: 0.75em;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+/* ─── List widgets (recent notes) ─── */
+.iris-hp-recent-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.iris-hp-recent-item,
-.iris-hp-task-item {
+.iris-hp-recent-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -279,13 +312,11 @@
   transition: background 0.1s ease;
 }
 
-.iris-hp-recent-item:hover,
-.iris-hp-task-item:hover {
+.iris-hp-recent-item:hover {
   background: var(--background-modifier-hover);
 }
 
-.iris-hp-recent-name,
-.iris-hp-task-name {
+.iris-hp-recent-name {
   flex: 1;
   font-size: 0.9em;
   color: var(--text-normal);

@@ -39,7 +39,8 @@ export class RecentNotesWidget extends BaseWidget {
 
     // Estimate how many items fit: each item is roughly 1 line-height + 12px padding
     const itemHeight = 32; // ~20px text + 12px padding
-    const available = this.bodyEl.clientHeight || 200;
+    const titleHeight = 28;
+    const available = (this.bodyEl.clientHeight || 200) - titleHeight;
     const max = Math.max(1, Math.floor(available / itemHeight));
     const displayed = files.slice(0, max);
 
@@ -48,6 +49,7 @@ export class RecentNotesWidget extends BaseWidget {
       return;
     }
 
+    this.bodyEl.createEl("h6", { cls: "iris-hp-widget-title", text: "Recent notes" });
     const listEl = this.bodyEl.createEl("ul", { cls: "iris-hp-recent-list" });
 
     for (const file of displayed) {
