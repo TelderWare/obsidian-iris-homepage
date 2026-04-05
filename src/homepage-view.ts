@@ -298,7 +298,6 @@ export class HomepageView extends ItemView {
       widget.row = Math.max(0, cell.row - this.dragOffsetRow);
       this.engine.clamp(widget);
       this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
-      this.engine.compact(this.plugin.settings.widgets, widget.id);
       this.draggedWidgetId = null;
 
       this.animateReflow(gridEl, oldPositions);
@@ -407,7 +406,6 @@ export class HomepageView extends ItemView {
       if (widget.width !== origWidth || widget.height !== origHeight || widget.col !== origCol || widget.row !== origRow) {
         const oldPositions = this.snapshotPositions(gridEl);
         this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
-        this.engine.compact(this.plugin.settings.widgets, widget.id);
         this.animateReflow(gridEl, oldPositions);
         this.plugin.saveData(this.plugin.settings);
       }

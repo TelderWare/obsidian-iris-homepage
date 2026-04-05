@@ -116,13 +116,35 @@ export class GridEngine {
       }
     }
 
+    if (displaced.size === 0) return;
+
     for (const id of displaced) {
       const w = widgets.find((w) => w.id === id);
       if (!w) continue;
       w.row = movedWidget.row + movedWidget.height;
     }
 
-    this.compact(widgets, movedWidget.id);
+    // Only compact the displaced widgets, not everything on the board
+    this.compactSubset(widgets, displaced);
+  }
+
+  /** Compact only the given widget IDs, leaving others in place. */
+  private compactSubset(widgets: WidgetConfig[], ids: Set<string>): void {
+    const sorted = widgets.filter((w) => ids.has(w.id)).sort((a, b) => a.row - b.row || a.col - b.col);
+    const map = this.buildOccupancyMap(widgets);
+
+    for (const widget of sorted) {
+      this.removeFromMap(map, widget);
+      let targetRow = 0;
+      while (targetRow < widget.row) {
+        if (this.canPlaceWithMap(map, widget.col, targetRow, widget.width, widget.height)) {
+          widget.row = targetRow;
+          break;
+        }
+        targetRow++;
+      }
+      this.addToMap(map, widget);
+    }
   }
 
   getMaxRow(widgets: WidgetConfig[]): number {
