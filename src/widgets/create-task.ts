@@ -120,6 +120,10 @@ export class CreateTaskWidget extends BaseWidget {
   }
 
   private async parseDate(input: string): Promise<{ date: string; time: string | null } | null> {
+    const lower = input.toLowerCase();
+    if (lower === "asap") return { date: "ASAP", time: null };
+    if (lower === "eventually") return { date: "Eventually", time: null };
+
     const results = chrono.parse(input);
     if (results.length > 0) {
       const start = results[0].start;
@@ -145,7 +149,7 @@ export class CreateTaskWidget extends BaseWidget {
         max_tokens: 64,
         messages: [{
           role: "user",
-          content: `Today is ${todayStr}. Parse this into a date and optional time. Return ONLY valid JSON: {"date":"YYYY-MM-DD","time":"HH:mm"} or {"date":"YYYY-MM-DD","time":null}. Input: "${input}"`,
+          content: `Today is ${todayStr}. Parse this into a date and optional time. Return ONLY valid JSON: {"date":"YYYY-MM-DD","time":"HH:mm"} or {"date":"YYYY-MM-DD","time":null}. If the input conveys immediate urgency, return {"date":"Immediately","time":null}. If the input conveys low priority or no rush, return {"date":"Eventually","time":null}. Input: "${input}"`,
         }],
       };
 
@@ -171,7 +175,7 @@ export class CreateTaskWidget extends BaseWidget {
       const match = text.match(/\{[^}]+\}/);
       if (!match) return null;
       const obj = JSON.parse(match[0]);
-      if (!obj.date || !/^\d{4}-\d{2}-\d{2}$/.test(obj.date)) return null;
+      if (!obj.date || (!/^\d{4}-\d{2}-\d{2}$/.test(obj.date) && obj.date !== "Immediately" && obj.date !== "Eventually")) return null;
       return { date: obj.date, time: obj.time || null };
     } catch {
       return null;
