@@ -18,6 +18,7 @@ export interface WidgetConfig {
 
 export interface IrisHomepageSettings {
   columns: number;
+  rows: number;
   widgets: WidgetConfig[];
   openOnStartup: boolean;
   replaceNewTab: boolean;

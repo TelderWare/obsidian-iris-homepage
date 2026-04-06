@@ -84,7 +84,12 @@ export class HomepageView extends ItemView {
     const gridEl = root.createDiv({ cls: "iris-hp-grid" });
     this.gridEl = gridEl;
     gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
-    gridEl.style.gridAutoRows = `${ROW_HEIGHT}px`;
+    const fixedRows = this.plugin.settings.rows;
+    if (fixedRows > 0) {
+      gridEl.style.gridTemplateRows = `repeat(${fixedRows}, ${ROW_HEIGHT}px)`;
+    } else {
+      gridEl.style.gridAutoRows = `${ROW_HEIGHT}px`;
+    }
     gridEl.style.gap = `${GRID_GAP}px`;
 
     for (const config of this.plugin.settings.widgets) {
@@ -104,7 +109,7 @@ export class HomepageView extends ItemView {
       const rootStyle = getComputedStyle(this.contentEl);
       const rootPadding = parseFloat(rootStyle.paddingTop) + parseFloat(rootStyle.paddingBottom);
       const viewportRows = Math.floor((this.contentEl.clientHeight - rootPadding) / (ROW_HEIGHT + GRID_GAP));
-      const rows = Math.max(maxRow + 2, viewportRows);
+      const rows = fixedRows > 0 ? fixedRows : Math.max(maxRow + 2, viewportRows);
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });

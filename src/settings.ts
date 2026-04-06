@@ -32,6 +32,21 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Grid rows")
+      .setDesc("Number of rows in the widget grid (0 = auto-grow)")
+      .addDropdown((drop) => {
+        drop.addOption("0", "Auto");
+        for (let i = 2; i <= 24; i++) {
+          drop.addOption(String(i), String(i));
+        }
+        drop.setValue(String(this.plugin.settings.rows));
+        drop.onChange(async (val) => {
+          this.plugin.settings.rows = parseInt(val, 10);
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
       .setName("Open on startup")
       .setDesc("Show the homepage when Obsidian starts")
       .addToggle((toggle) =>
