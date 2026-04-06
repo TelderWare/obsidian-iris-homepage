@@ -22,7 +22,7 @@ export class CreateTaskWidget extends BaseWidget {
     const icon = btn.createDiv({ cls: "iris-hp-create-task-icon" });
     setIcon(icon, "check-square");
 
-    btn.createDiv({ cls: "iris-hp-create-task-label", text: "Create task" });
+    btn.createDiv({ cls: "iris-hp-create-task-label", text: "New task" });
 
     btn.addEventListener("click", () => this.togglePopover());
   }

@@ -262,7 +262,7 @@ export class HomepageView extends ItemView {
         case "new-note":
           widget = new NewNoteWidget(this.app, wrapper, config, this.plugin);
           break;
-        case "create-task":
+        case "new-task":
           widget = new CreateTaskWidget(this.app, wrapper, config, this.plugin);
           break;
         case "command":

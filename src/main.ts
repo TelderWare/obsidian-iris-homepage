@@ -70,7 +70,15 @@ export default class IrisHomepagePlugin extends Plugin {
       this.settings.gridVersion = 3;
     }
 
-    if (!data?.gridVersion || data.gridVersion < 3) {
+    // Migration: v4 renamed create-task → new-task.
+    if (this.settings.gridVersion < 4) {
+      for (const w of this.settings.widgets) {
+        if (w.type === "create-task") w.type = "new-task";
+      }
+      this.settings.gridVersion = 4;
+    }
+
+    if (!data?.gridVersion || data.gridVersion < 4) {
       await this.saveData(this.settings);
     }
   }

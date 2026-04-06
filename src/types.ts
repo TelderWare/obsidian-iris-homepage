@@ -1,4 +1,4 @@
-export const BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note", "new-note", "create-task", "command", "quick-switcher", "iris-tasks-view"] as const;
+export const BUILTIN_WIDGET_TYPES = ["recent-notes", "embedded-note", "new-note", "new-task", "command", "quick-switcher", "iris-tasks-view"] as const;
 export type BuiltinWidgetType = (typeof BUILTIN_WIDGET_TYPES)[number];
 
 export interface WidgetConfig {
