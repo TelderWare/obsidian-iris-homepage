@@ -164,16 +164,20 @@ export class HomepageView extends ItemView {
       [widgets[i], widgets[j]] = [widgets[j], widgets[i]];
     }
 
+    // Compute a tight row bound: the minimum rows needed if all widgets were packed perfectly
+    const fixedRows = this.plugin.settings.rows;
+    const totalCellArea = widgets.reduce((sum, w) => sum + w.width * w.height, 0);
+    const packedRows = Math.ceil(totalCellArea / cols);
+    const rowBound = fixedRows > 0 ? fixedRows : Math.max(packedRows, 4);
+
     // Place each widget at a random valid position
     const placed: WidgetConfig[] = [];
     for (const w of widgets) {
       const map = this.engine.buildOccupancyMap(placed);
-      const maxRow = placed.length > 0 ? this.engine.getMaxRow(placed) + 2 : 0;
-      const rows = Math.max(maxRow + w.height, 6);
 
-      // Collect all valid positions
+      // Collect all valid positions within the bound
       const candidates: { col: number; row: number }[] = [];
-      for (let r = 0; r <= rows; r++) {
+      for (let r = 0; r <= rowBound - w.height; r++) {
         for (let c = 0; c <= cols - w.width; c++) {
           let fits = true;
           for (let dr = 0; dr < w.height && fits; dr++) {
