@@ -78,7 +78,14 @@ export default class IrisHomepagePlugin extends Plugin {
       this.settings.gridVersion = 4;
     }
 
-    if (!data?.gridVersion || data.gridVersion < 4) {
+    // Migration: v5 added configurable rowHeight and gridGap.
+    if (this.settings.gridVersion < 5) {
+      this.settings.rowHeight ??= 60;
+      this.settings.gridGap ??= 12;
+      this.settings.gridVersion = 5;
+    }
+
+    if (!data?.gridVersion || data.gridVersion < 5) {
       await this.saveData(this.settings);
     }
   }

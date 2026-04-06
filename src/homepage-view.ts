@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
 import type IrisHomepagePlugin from "./main";
 import type { WidgetConfig } from "./types";
 import { isBuiltinWidget } from "./types";
-import { VIEW_TYPE_HOMEPAGE, ROW_HEIGHT, GRID_GAP } from "./constants";
+import { VIEW_TYPE_HOMEPAGE } from "./constants";
 import { GridEngine } from "./grid-engine";
 import { BaseWidget } from "./widgets/base-widget";
 import { RecentNotesWidget } from "./widgets/recent-notes";
@@ -69,6 +69,14 @@ export class HomepageView extends ItemView {
     this.widgetInstances.clear();
   }
 
+  private get rowHeight(): number {
+    return this.plugin.settings.rowHeight;
+  }
+
+  private get gridGap(): number {
+    return this.plugin.settings.gridGap;
+  }
+
   render(): void {
     if (this.placingCleanup) this.placingCleanup();
     this.engine.setColumns(this.plugin.settings.columns);
@@ -89,14 +97,7 @@ export class HomepageView extends ItemView {
 
     const gridEl = root.createDiv({ cls: "iris-hp-grid" });
     this.gridEl = gridEl;
-    gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
-    const fixedRows = this.plugin.settings.rows;
-    if (fixedRows > 0) {
-      gridEl.style.gridTemplateRows = `repeat(${fixedRows}, ${ROW_HEIGHT}px)`;
-    } else {
-      gridEl.style.gridAutoRows = `${ROW_HEIGHT}px`;
-    }
-    gridEl.style.gap = `${GRID_GAP}px`;
+    this.applyGridTemplate(gridEl);
 
     for (const config of this.plugin.settings.widgets) {
       this.renderWidget(gridEl, config);
@@ -110,24 +111,66 @@ export class HomepageView extends ItemView {
     }
 
     if (this.editMode) {
-      const cols = this.plugin.settings.columns;
-      const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
-      const rootStyle = getComputedStyle(this.contentEl);
-      const rootPadding = parseFloat(rootStyle.paddingTop) + parseFloat(rootStyle.paddingBottom);
-      const viewportRows = Math.floor((this.contentEl.clientHeight - rootPadding) / (ROW_HEIGHT + GRID_GAP));
-      const rows = fixedRows > 0 ? fixedRows : Math.max(maxRow + 2, viewportRows);
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });
-          dot.style.gridColumn = `${c + 1}`;
-          dot.style.gridRow = `${r + 1}`;
-        }
-      }
+      this.renderGridDots(gridEl);
     }
 
     this.attachGridListeners(gridEl);
 
     this.renderToolbar(root);
+  }
+
+  /** Apply grid template styles (columns, rows, gap) to the grid element. */
+  private applyGridTemplate(gridEl: HTMLElement): void {
+    gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
+    const fixedRows = this.plugin.settings.rows;
+    if (fixedRows > 0) {
+      gridEl.style.gridTemplateRows = `repeat(${fixedRows}, ${this.rowHeight}px)`;
+    } else {
+      gridEl.style.gridAutoRows = `${this.rowHeight}px`;
+    }
+    gridEl.style.gap = `${this.gridGap}px`;
+  }
+
+  /** Render the edit-mode grid dots. */
+  private renderGridDots(gridEl: HTMLElement): void {
+    // Remove existing dots
+    gridEl.querySelectorAll(".iris-hp-grid-dot").forEach((el) => el.remove());
+
+    const cols = this.plugin.settings.columns;
+    const fixedRows = this.plugin.settings.rows;
+    const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
+    const rootStyle = getComputedStyle(this.contentEl);
+    const rootPadding = parseFloat(rootStyle.paddingTop) + parseFloat(rootStyle.paddingBottom);
+    const viewportRows = Math.floor((this.contentEl.clientHeight - rootPadding) / (this.rowHeight + this.gridGap));
+    const rows = fixedRows > 0 ? fixedRows : Math.max(maxRow + 2, viewportRows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });
+        dot.style.gridColumn = `${c + 1}`;
+        dot.style.gridRow = `${r + 1}`;
+      }
+    }
+  }
+
+  /** Update positions of existing widget wrappers without destroying/recreating them. */
+  private updateLayout(): void {
+    const gridEl = this.gridEl;
+    if (!gridEl) return;
+
+    this.applyGridTemplate(gridEl);
+
+    for (const config of this.plugin.settings.widgets) {
+      const wrapper = gridEl.querySelector<HTMLElement>(
+        `.iris-hp-widget-wrapper[data-widget-id="${config.id}"]`
+      );
+      if (wrapper) {
+        this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
+      }
+    }
+
+    if (this.editMode) {
+      this.renderGridDots(gridEl);
+    }
   }
 
   /** Save a snapshot of the current widget layout onto the undo stack. Call BEFORE mutating. */
@@ -203,7 +246,11 @@ export class HomepageView extends ItemView {
     }
 
     this.plugin.saveData(this.plugin.settings);
-    this.render();
+    if (this.gridEl) {
+      const oldPositions = this.snapshotPositions(this.gridEl);
+      this.updateLayout();
+      this.animateReflow(this.gridEl, oldPositions);
+    }
   }
 
   private renderToolbar(root: HTMLElement): void {
@@ -280,6 +327,7 @@ export class HomepageView extends ItemView {
           const oldPositions = this.snapshotPositions(gridEl);
           this.plugin.settings.widgets.splice(idx, 1);
           this.engine.compact(this.plugin.settings.widgets);
+          this.updateLayout();
           this.animateReflow(gridEl, oldPositions);
           this.plugin.saveData(this.plugin.settings);
         };
@@ -487,6 +535,7 @@ export class HomepageView extends ItemView {
       this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
       this.draggedWidgetId = null;
 
+      this.updateLayout();
       this.animateReflow(gridEl, oldPositions);
       this.plugin.saveData(this.plugin.settings);
     });
@@ -535,8 +584,8 @@ export class HomepageView extends ItemView {
 
     const gridRect = gridEl.getBoundingClientRect();
     const { cellW, cellH } = this.getCellSize(gridRect);
-    const stepX = cellW + GRID_GAP;
-    const stepY = cellH + GRID_GAP;
+    const stepX = cellW + this.gridGap;
+    const stepY = cellH + this.gridGap;
 
     const origCol = widget.col;
     const origRow = widget.row;
@@ -622,6 +671,7 @@ export class HomepageView extends ItemView {
         this.pushUndo();
         const oldPositions = this.snapshotPositions(gridEl);
         this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
+        this.updateLayout();
         this.animateReflow(gridEl, oldPositions);
         this.plugin.saveData(this.plugin.settings);
       }
@@ -662,8 +712,8 @@ export class HomepageView extends ItemView {
 
   private getCellSize(gridRect: DOMRect): { cellW: number; cellH: number } {
     return {
-      cellW: (gridRect.width - GRID_GAP * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns,
-      cellH: ROW_HEIGHT,
+      cellW: (gridRect.width - this.gridGap * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns,
+      cellH: this.rowHeight,
     };
   }
 
@@ -674,7 +724,7 @@ export class HomepageView extends ItemView {
     const relX = e.clientX - gridRect.left;
     const relY = e.clientY - gridRect.top;
 
-    return this.engine.pixelToCell(relX, relY, cellW + GRID_GAP, cellH + GRID_GAP);
+    return this.engine.pixelToCell(relX, relY, cellW + this.gridGap, cellH + this.gridGap);
   }
 
   /** Snapshot bounding rects for all widget wrappers keyed by widget ID. */
@@ -687,17 +737,8 @@ export class HomepageView extends ItemView {
     return positions;
   }
 
-  /** Apply new grid placements and FLIP-animate from old positions. */
+  /** FLIP-animate widgets from old positions to their current grid positions. Call after updateLayout(). */
   private animateReflow(gridEl: HTMLElement, oldPositions: Map<string, DOMRect>): void {
-    for (const config of this.plugin.settings.widgets) {
-      const wrapper = gridEl.querySelector<HTMLElement>(
-        `.iris-hp-widget-wrapper[data-widget-id="${config.id}"]`
-      );
-      if (!wrapper) continue;
-
-      this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
-    }
-
     // Force layout so new positions are computed
     gridEl.offsetHeight; // eslint-disable-line @typescript-eslint/no-unused-expressions
 

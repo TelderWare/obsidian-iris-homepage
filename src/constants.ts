@@ -7,6 +7,8 @@ export const GRID_GAP = 12;
 export const DEFAULT_SETTINGS: IrisHomepageSettings = {
   columns: 8,
   rows: 0,
+  rowHeight: ROW_HEIGHT,
+  gridGap: GRID_GAP,
   widgets: [
     {
       id: "default-recent",

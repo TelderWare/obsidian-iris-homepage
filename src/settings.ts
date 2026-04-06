@@ -1,6 +1,6 @@
 import { PluginSettingTab, App, Setting } from "obsidian";
 import type IrisHomepagePlugin from "./main";
-import { resolveWidgetLabel, ROW_HEIGHT, GRID_GAP } from "./constants";
+import { resolveWidgetLabel } from "./constants";
 import { GridEngine } from "./grid-engine";
 import { getApiKey, setApiKey } from "./utils";
 
@@ -50,6 +50,34 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
+
+    new Setting(containerEl)
+      .setName("Row height")
+      .setDesc("Height of each grid row in pixels (30-120)")
+      .addSlider((slider) =>
+        slider
+          .setLimits(30, 120, 5)
+          .setValue(this.plugin.settings.rowHeight)
+          .setDynamicTooltip()
+          .onChange(async (val) => {
+            this.plugin.settings.rowHeight = val;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Grid gap")
+      .setDesc("Spacing between widgets in pixels (0-32)")
+      .addSlider((slider) =>
+        slider
+          .setLimits(0, 32, 2)
+          .setValue(this.plugin.settings.gridGap)
+          .setDynamicTooltip()
+          .onChange(async (val) => {
+            this.plugin.settings.gridGap = val;
+            await this.plugin.saveSettings();
+          })
+      );
 
     new Setting(containerEl)
       .setName("Open on startup")

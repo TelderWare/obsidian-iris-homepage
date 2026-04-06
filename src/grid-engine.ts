@@ -9,6 +9,7 @@ function cellKey(row: number, col: number): number {
 export class GridEngine {
   private columns: number;
   private rows: number; // 0 = unlimited
+  private map: Map<number, string> = new Map();
 
   constructor(columns: number, rows = 0) {
     this.columns = columns;
@@ -23,20 +24,25 @@ export class GridEngine {
     this.rows = rows;
   }
 
+  /** Rebuild the persistent occupancy map from scratch. */
+  sync(widgets: WidgetConfig[]): void {
+    this.map.clear();
+    for (const w of widgets) {
+      this.addToMap(this.map, w);
+    }
+  }
+
+  /** Build a standalone occupancy map (does not affect the persistent map). */
   buildOccupancyMap(widgets: WidgetConfig[], excludeId?: string): Map<number, string> {
     const map = new Map<number, string>();
     for (const w of widgets) {
       if (w.id === excludeId) continue;
-      for (let r = w.row; r < w.row + w.height; r++) {
-        for (let c = w.col; c < w.col + w.width; c++) {
-          map.set(cellKey(r, c), w.id);
-        }
-      }
+      this.addToMap(map, w);
     }
     return map;
   }
 
-  private canPlaceWithMap(
+  canPlaceWithMap(
     map: Map<number, string>,
     col: number,
     row: number,
@@ -53,7 +59,7 @@ export class GridEngine {
     return true;
   }
 
-  private removeFromMap(map: Map<number, string>, widget: WidgetConfig): void {
+  removeFromMap(map: Map<number, string>, widget: WidgetConfig): void {
     for (let r = widget.row; r < widget.row + widget.height; r++) {
       for (let c = widget.col; c < widget.col + widget.width; c++) {
         map.delete(cellKey(r, c));
@@ -61,7 +67,7 @@ export class GridEngine {
     }
   }
 
-  private addToMap(map: Map<number, string>, widget: WidgetConfig): void {
+  addToMap(map: Map<number, string>, widget: WidgetConfig): void {
     for (let r = widget.row; r < widget.row + widget.height; r++) {
       for (let c = widget.col; c < widget.col + widget.width; c++) {
         map.set(cellKey(r, c), widget.id);
@@ -69,23 +75,36 @@ export class GridEngine {
     }
   }
 
+  /** 2D compact: move widgets to the topmost-leftmost valid position. */
   compact(widgets: WidgetConfig[], pinnedId?: string): void {
     const sorted = [...widgets].sort((a, b) => a.row - b.row || a.col - b.col);
-    const map = this.buildOccupancyMap(widgets);
+    const workMap = new Map<number, string>();
+
+    // Place pinned widget first so others pack around it
+    if (pinnedId) {
+      const pinned = sorted.find((w) => w.id === pinnedId);
+      if (pinned) this.addToMap(workMap, pinned);
+    }
 
     for (const widget of sorted) {
       if (widget.id === pinnedId) continue;
-      this.removeFromMap(map, widget);
-      let targetRow = 0;
-      while (targetRow < widget.row) {
-        if (this.canPlaceWithMap(map, widget.col, targetRow, widget.width, widget.height)) {
-          widget.row = targetRow;
-          break;
+
+      let placed = false;
+      for (let r = 0; r <= widget.row && !placed; r++) {
+        for (let c = 0; c <= this.columns - widget.width; c++) {
+          if (this.canPlaceWithMap(workMap, c, r, widget.width, widget.height)) {
+            widget.row = r;
+            widget.col = c;
+            placed = true;
+            break;
+          }
         }
-        targetRow++;
       }
-      this.addToMap(map, widget);
+      this.addToMap(workMap, widget);
     }
+
+    // Sync persistent map after compaction
+    this.map = workMap;
   }
 
   clamp(widget: WidgetConfig): void {
@@ -130,7 +149,10 @@ export class GridEngine {
       }
     }
 
-    if (displaced.size === 0) return;
+    if (displaced.size === 0) {
+      this.sync(widgets);
+      return;
+    }
 
     for (const id of displaced) {
       const w = widgets.find((w) => w.id === id);
@@ -143,6 +165,7 @@ export class GridEngine {
 
     // Only compact the displaced widgets, not everything on the board
     this.compactSubset(widgets, displaced);
+    this.sync(widgets);
   }
 
   /** Compact only the given widget IDs, leaving others in place. */
@@ -152,13 +175,16 @@ export class GridEngine {
 
     for (const widget of sorted) {
       this.removeFromMap(map, widget);
-      let targetRow = 0;
-      while (targetRow < widget.row) {
-        if (this.canPlaceWithMap(map, widget.col, targetRow, widget.width, widget.height)) {
-          widget.row = targetRow;
-          break;
+      let placed = false;
+      for (let r = 0; r <= widget.row && !placed; r++) {
+        for (let c = 0; c <= this.columns - widget.width; c++) {
+          if (this.canPlaceWithMap(map, c, r, widget.width, widget.height)) {
+            widget.row = r;
+            widget.col = c;
+            placed = true;
+            break;
+          }
         }
-        targetRow++;
       }
       this.addToMap(map, widget);
     }
