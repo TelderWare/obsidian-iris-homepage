@@ -133,31 +133,41 @@ export class CreateTaskWidget extends BaseWidget {
       return { date: formatDate(parsed), time };
     }
 
-    // Fallback to Claude API
+    // Fallback to Claude API (via Iris Relay when available)
+    const relay = (this.app as any).irisRelay;
     const apiKey = getApiKey(this.app);
-    if (!apiKey) return null;
+    if (!relay && !apiKey) return null;
 
     try {
       const todayStr = formatDate(new Date());
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 64,
-          messages: [{
-            role: "user",
-            content: `Today is ${todayStr}. Parse this into a date and optional time. Return ONLY valid JSON: {"date":"YYYY-MM-DD","time":"HH:mm"} or {"date":"YYYY-MM-DD","time":null}. Input: "${input}"`,
-          }],
-        }),
-      });
-      if (!res.ok) return null;
-      const body = await res.json();
-      const text = body?.content?.[0]?.text ?? "";
+      const requestBody = {
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 64,
+        messages: [{
+          role: "user",
+          content: `Today is ${todayStr}. Parse this into a date and optional time. Return ONLY valid JSON: {"date":"YYYY-MM-DD","time":"HH:mm"} or {"date":"YYYY-MM-DD","time":null}. Input: "${input}"`,
+        }],
+      };
+
+      let text: string;
+      if (relay) {
+        const json = await relay.request(requestBody, 1, true);
+        text = json?.content?.[0]?.text ?? "";
+      } else {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey!,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        if (!res.ok) return null;
+        const body = await res.json();
+        text = body?.content?.[0]?.text ?? "";
+      }
+
       const match = text.match(/\{[^}]+\}/);
       if (!match) return null;
       const obj = JSON.parse(match[0]);
