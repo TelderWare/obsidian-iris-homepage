@@ -22,6 +22,7 @@ export interface IrisHomepageSettings {
   openOnStartup: boolean;
   replaceNewTab: boolean;
   borderless: boolean;
+  taskFolder: string;
   gridVersion?: number;
 }
 

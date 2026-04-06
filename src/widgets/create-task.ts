@@ -3,7 +3,7 @@ import * as chrono from "chrono-node";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
-import { TASK_FOLDER, formatDate, getApiKey } from "../utils";
+import { formatDate, getApiKey } from "../utils";
 
 export class CreateTaskWidget extends BaseWidget {
   private popover: HTMLElement | null = null;
@@ -52,6 +52,14 @@ export class CreateTaskWidget extends BaseWidget {
     pop.addEventListener("mousedown", (e) => e.stopPropagation());
     pop.addEventListener("click", (e) => e.stopPropagation());
 
+    // Flip popover upward if it would overflow the viewport
+    requestAnimationFrame(() => {
+      const popRect = pop.getBoundingClientRect();
+      if (popRect.bottom > window.innerHeight) {
+        pop.addClass("iris-hp-task-popover-above");
+      }
+    });
+
     setTimeout(() => document.addEventListener("click", this.onDocClick), 0);
     titleInput.focus();
   }
@@ -85,11 +93,11 @@ export class CreateTaskWidget extends BaseWidget {
     await this.ensureFolder();
 
     const safeName = title.replace(/[\\/:*?"<>|]/g, "_");
-    let path = `${TASK_FOLDER}/${safeName}.md`;
+    let path = `${this.plugin.settings.taskFolder}/${safeName}.md`;
     if (this.app.vault.getAbstractFileByPath(path)) {
       let i = 1;
-      while (this.app.vault.getAbstractFileByPath(`${TASK_FOLDER}/${safeName} ${i}.md`)) i++;
-      path = `${TASK_FOLDER}/${safeName} ${i}.md`;
+      while (this.app.vault.getAbstractFileByPath(`${this.plugin.settings.taskFolder}/${safeName} ${i}.md`)) i++;
+      path = `${this.plugin.settings.taskFolder}/${safeName} ${i}.md`;
     }
 
     await this.app.vault.create(path, lines.join("\n"));
@@ -161,8 +169,8 @@ export class CreateTaskWidget extends BaseWidget {
   }
 
   private async ensureFolder(): Promise<void> {
-    if (!this.app.vault.getAbstractFileByPath(TASK_FOLDER)) {
-      await this.app.vault.createFolder(TASK_FOLDER);
+    if (!this.app.vault.getAbstractFileByPath(this.plugin.settings.taskFolder)) {
+      await this.app.vault.createFolder(this.plugin.settings.taskFolder);
     }
   }
 

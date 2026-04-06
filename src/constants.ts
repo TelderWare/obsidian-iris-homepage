@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: IrisHomepageSettings = {
   openOnStartup: true,
   replaceNewTab: true,
   borderless: false,
+  taskFolder: "Tasks",
 };
 
 export const BUILTIN_WIDGETS: Record<BuiltinWidgetType, { label: string; icon: string; width: number; height: number }> = {

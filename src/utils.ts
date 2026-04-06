@@ -1,6 +1,5 @@
 import { App, TFile } from "obsidian";
 
-export const TASK_FOLDER = "Tasks";
 export const SECRET_KEY_ANTHROPIC = "anthropic-api-key";
 
 export function formatDate(date: Date): string {

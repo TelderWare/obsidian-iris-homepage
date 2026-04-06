@@ -31,6 +31,9 @@ export class HomepageView extends ItemView {
   private ghostEl: HTMLElement | null = null;
   private pendingWidget: PickerResult | null = null;
   private placingCleanup: (() => void) | null = null;
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
+  private static readonly MAX_UNDO = 50;
 
   constructor(leaf: WorkspaceLeaf, plugin: IrisHomepagePlugin) {
     super(leaf);
@@ -52,6 +55,13 @@ export class HomepageView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.render();
+
+    this.registerDomEvent(this.contentEl, "keydown", (e: KeyboardEvent) => {
+      if (!this.editMode) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key === "z" && !e.shiftKey) { e.preventDefault(); this.undo(); }
+      else if (mod && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); this.redo(); }
+    });
   }
 
   async onClose(): Promise<void> {
@@ -109,6 +119,78 @@ export class HomepageView extends ItemView {
     this.renderToolbar(root);
   }
 
+  /** Save a snapshot of the current widget layout onto the undo stack. Call BEFORE mutating. */
+  private pushUndo(): void {
+    this.undoStack.push(JSON.stringify(this.plugin.settings.widgets));
+    if (this.undoStack.length > HomepageView.MAX_UNDO) this.undoStack.shift();
+    this.redoStack.length = 0;
+  }
+
+  private undo(): void {
+    if (this.undoStack.length === 0) return;
+    this.redoStack.push(JSON.stringify(this.plugin.settings.widgets));
+    this.plugin.settings.widgets = JSON.parse(this.undoStack.pop()!);
+    this.plugin.saveData(this.plugin.settings);
+    this.render();
+  }
+
+  private redo(): void {
+    if (this.redoStack.length === 0) return;
+    this.undoStack.push(JSON.stringify(this.plugin.settings.widgets));
+    this.plugin.settings.widgets = JSON.parse(this.redoStack.pop()!);
+    this.plugin.saveData(this.plugin.settings);
+    this.render();
+  }
+
+  private shuffleLayout(): void {
+    this.pushUndo();
+    const widgets = this.plugin.settings.widgets;
+    const cols = this.plugin.settings.columns;
+
+    // Fisher-Yates shuffle the placement order
+    for (let i = widgets.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [widgets[i], widgets[j]] = [widgets[j], widgets[i]];
+    }
+
+    // Place each widget at a random valid position
+    const placed: WidgetConfig[] = [];
+    for (const w of widgets) {
+      const map = this.engine.buildOccupancyMap(placed);
+      const maxRow = placed.length > 0 ? this.engine.getMaxRow(placed) + 2 : 0;
+      const rows = Math.max(maxRow + w.height, 6);
+
+      // Collect all valid positions
+      const candidates: { col: number; row: number }[] = [];
+      for (let r = 0; r <= rows; r++) {
+        for (let c = 0; c <= cols - w.width; c++) {
+          let fits = true;
+          for (let dr = 0; dr < w.height && fits; dr++) {
+            for (let dc = 0; dc < w.width && fits; dc++) {
+              if (map.has((r + dr) * 32 + (c + dc))) fits = false;
+            }
+          }
+          if (fits) candidates.push({ col: c, row: r });
+        }
+      }
+
+      if (candidates.length > 0) {
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        w.col = pick.col;
+        w.row = pick.row;
+      } else {
+        // Fallback: place below everything
+        const pos = this.engine.findFirstAvailable(placed, w.width, w.height);
+        w.col = pos.col;
+        w.row = pos.row;
+      }
+      placed.push(w);
+    }
+
+    this.plugin.saveData(this.plugin.settings);
+    this.render();
+  }
+
   private renderToolbar(root: HTMLElement): void {
     const toolbar = root.createDiv({ cls: "iris-hp-toolbar" });
 
@@ -123,6 +205,29 @@ export class HomepageView extends ItemView {
     });
 
     if (this.editMode) {
+      const undoBtn = toolbar.createEl("button", {
+        cls: "iris-hp-toolbar-btn clickable-icon",
+        attr: { "aria-label": "Undo" },
+      });
+      setIcon(undoBtn, "undo");
+      undoBtn.toggleClass("iris-hp-toolbar-btn-disabled", this.undoStack.length === 0);
+      undoBtn.addEventListener("click", () => this.undo());
+
+      const redoBtn = toolbar.createEl("button", {
+        cls: "iris-hp-toolbar-btn clickable-icon",
+        attr: { "aria-label": "Redo" },
+      });
+      setIcon(redoBtn, "redo");
+      redoBtn.toggleClass("iris-hp-toolbar-btn-disabled", this.redoStack.length === 0);
+      redoBtn.addEventListener("click", () => this.redo());
+
+      const shuffleBtn = toolbar.createEl("button", {
+        cls: "iris-hp-toolbar-btn clickable-icon",
+        attr: { "aria-label": "Shuffle layout" },
+      });
+      setIcon(shuffleBtn, "shuffle");
+      shuffleBtn.addEventListener("click", () => this.shuffleLayout());
+
       const addBtn = toolbar.createEl("button", {
         cls: "iris-hp-toolbar-btn clickable-icon",
         attr: { "aria-label": "Add widget" },
@@ -156,6 +261,7 @@ export class HomepageView extends ItemView {
         const deleteWidget = () => {
           const idx = this.plugin.settings.widgets.findIndex((w) => w.id === widgetId);
           if (idx === -1) return;
+          this.pushUndo();
           const oldPositions = this.snapshotPositions(gridEl);
           this.plugin.settings.widgets.splice(idx, 1);
           this.engine.compact(this.plugin.settings.widgets);
@@ -249,37 +355,40 @@ export class HomepageView extends ItemView {
     wrapper.setAttribute("draggable", "true");
     this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
 
-    let widget: BaseWidget;
+    try {
+      const widget = this.createWidget(wrapper, config);
+      this.widgetInstances.set(config.id, widget);
+    } catch (err) {
+      console.error(`[iris-homepage] Failed to render widget "${config.type}" (${config.id}):`, err);
+      wrapper.empty();
+      wrapper.addClass("iris-hp-widget");
+      const errorBody = wrapper.createDiv({ cls: "iris-hp-widget-body iris-hp-widget-error" });
+      const icon = errorBody.createDiv({ cls: "iris-hp-widget-error-icon" });
+      setIcon(icon, "alert-triangle");
+      errorBody.createEl("span", { text: "Widget failed to load" });
+    }
+  }
 
+  private createWidget(wrapper: HTMLElement, config: WidgetConfig): BaseWidget {
     if (isBuiltinWidget(config.type)) {
       switch (config.type) {
         case "recent-notes":
-          widget = new RecentNotesWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new RecentNotesWidget(this.app, wrapper, config, this.plugin);
         case "embedded-note":
-          widget = new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
         case "new-note":
-          widget = new NewNoteWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new NewNoteWidget(this.app, wrapper, config, this.plugin);
         case "new-task":
-          widget = new CreateTaskWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new CreateTaskWidget(this.app, wrapper, config, this.plugin);
         case "command":
-          widget = new CommandWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new CommandWidget(this.app, wrapper, config, this.plugin);
         case "quick-switcher":
-          widget = new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
         case "iris-tasks-view":
-          widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
-          break;
+          return new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
       }
-    } else {
-      widget = new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
     }
-
-    this.widgetInstances.set(config.id, widget);
+    return new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
   }
 
   private addWidgetAt(result: PickerResult, col: number, row: number): void {
@@ -296,6 +405,7 @@ export class HomepageView extends ItemView {
       height,
     };
 
+    this.pushUndo();
     this.plugin.settings.widgets.push(config);
     this.engine.resolveCollisions(this.plugin.settings.widgets, config);
     this.plugin.saveSettings();
@@ -350,6 +460,7 @@ export class HomepageView extends ItemView {
       const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
       if (!widget) return;
 
+      this.pushUndo();
       const oldPositions = this.snapshotPositions(gridEl);
 
       widget.col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
@@ -487,6 +598,7 @@ export class HomepageView extends ItemView {
       widget.height = r.h;
 
       if (widget.width !== origWidth || widget.height !== origHeight || widget.col !== origCol || widget.row !== origRow) {
+        this.pushUndo();
         const oldPositions = this.snapshotPositions(gridEl);
         this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
         this.animateReflow(gridEl, oldPositions);

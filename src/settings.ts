@@ -61,6 +61,19 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
         })
       );
 
+    new Setting(containerEl)
+      .setName("Task folder")
+      .setDesc("Folder where new tasks are created")
+      .addText((text) =>
+        text
+          .setPlaceholder("Tasks")
+          .setValue(this.plugin.settings.taskFolder)
+          .onChange(async (val) => {
+            this.plugin.settings.taskFolder = val.trim() || "Tasks";
+            await this.plugin.saveSettings();
+          })
+      );
+
     containerEl.createEl("h2", { text: "AI" });
 
     const apiKeySetting = new Setting(containerEl)
