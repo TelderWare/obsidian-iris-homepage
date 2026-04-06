@@ -1,4 +1,4 @@
-import { App, Notice, setIcon } from "obsidian";
+import { App, Notice, requestUrl, setIcon } from "obsidian";
 import * as chrono from "chrono-node";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
@@ -158,18 +158,23 @@ export class CreateTaskWidget extends BaseWidget {
         const json = await relay.request(requestBody, 1, true);
         text = json?.content?.[0]?.text ?? "";
       } else {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey!,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        });
-        if (!res.ok) return null;
-        const body = await res.json();
-        text = body?.content?.[0]?.text ?? "";
+        const response = await Promise.race([
+          requestUrl({
+            url: "https://api.anthropic.com/v1/messages",
+            method: "POST",
+            headers: {
+              "x-api-key": apiKey!,
+              "anthropic-version": "2023-06-01",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Date parsing timed out")), 15_000),
+          ),
+        ]);
+        if (response.status >= 400) return null;
+        text = response.json?.content?.[0]?.text ?? "";
       }
 
       const match = text.match(/\{[^}]+\}/);
@@ -177,7 +182,8 @@ export class CreateTaskWidget extends BaseWidget {
       const obj = JSON.parse(match[0]);
       if (!obj.date || (!/^\d{4}-\d{2}-\d{2}$/.test(obj.date) && obj.date !== "Immediately" && obj.date !== "Eventually")) return null;
       return { date: obj.date, time: obj.time || null };
-    } catch {
+    } catch (e) {
+      console.error("Iris Homepage: date parsing failed", e);
       return null;
     }
   }

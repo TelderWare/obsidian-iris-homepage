@@ -1,10 +1,11 @@
-import { App, View, WorkspaceLeaf } from "obsidian";
+import { App, Component, View, WorkspaceLeaf } from "obsidian";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
 
 export class ViewEmbedWidget extends BaseWidget {
   private embeddedView: View | null = null;
+  private embeddedLeaf: WorkspaceLeaf | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
   constructor(app: App, containerEl: HTMLElement, config: WidgetConfig, plugin: IrisHomepagePlugin) {
@@ -44,9 +45,11 @@ export class ViewEmbedWidget extends BaseWidget {
     const registry = (this.app as any).viewRegistry;
     if (!registry) return false;
 
-    const viewCreator = registry.viewByType instanceof Map
-      ? registry.viewByType.get(this.config.type)
-      : registry.viewByType?.[this.config.type];
+    const viewByType: Map<string, unknown> = registry.viewByType instanceof Map
+      ? registry.viewByType
+      : new Map(Object.entries(registry.viewByType));
+    const viewCreator = viewByType.get(this.config.type) as
+      ((leaf: WorkspaceLeaf) => View) | undefined;
 
     if (!viewCreator) return false;
 
@@ -57,12 +60,13 @@ export class ViewEmbedWidget extends BaseWidget {
     (leaf as any).view = view;
 
     this.embeddedView = view;
+    this.embeddedLeaf = leaf;
 
     this.bodyEl.appendChild(view.containerEl);
     view.containerEl.addClass("iris-hp-embedded-leaf");
 
-    if (view.onOpen) {
-      await view.onOpen();
+    if ((view as any).onOpen) {
+      await (view as any).onOpen();
     }
 
     this.resizeObserver = new ResizeObserver(() => {
@@ -100,14 +104,16 @@ export class ViewEmbedWidget extends BaseWidget {
     }
     if (this.embeddedView) {
       try {
-        if (this.embeddedView.onClose) {
-          this.embeddedView.onClose();
-        }
+        // Use unload() to properly detach all events registered via registerEvent().
+        // onClose() alone only runs view-specific teardown but does not remove
+        // event listeners registered on the Component, causing leaks.
+        (this.embeddedView as Component).unload();
       } catch {
         // View may already be cleaned up
       }
       this.embeddedView.containerEl.remove();
       this.embeddedView = null;
+      this.embeddedLeaf = null;
     }
   }
 
