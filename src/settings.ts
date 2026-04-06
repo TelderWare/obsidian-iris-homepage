@@ -1,6 +1,7 @@
 import { PluginSettingTab, App, Setting } from "obsidian";
 import type IrisHomepagePlugin from "./main";
-import { resolveWidgetLabel } from "./constants";
+import { resolveWidgetLabel, ROW_HEIGHT, GRID_GAP } from "./constants";
+import { GridEngine } from "./grid-engine";
 import { getApiKey, setApiKey } from "./utils";
 
 export class IrisHomepageSettingsTab extends PluginSettingTab {
@@ -35,7 +36,11 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       .setName("Grid rows")
       .setDesc("Number of rows in the widget grid (0 = auto-grow)")
       .addDropdown((drop) => {
-        drop.addOption("0", "Auto");
+        const engine = new GridEngine(this.plugin.settings.columns, this.plugin.settings.rows);
+        const currentRows = this.plugin.settings.widgets.length > 0
+          ? engine.getMaxRow(this.plugin.settings.widgets) + 1
+          : 0;
+        drop.addOption("0", `Auto (${currentRows})`);
         for (let i = 2; i <= 24; i++) {
           drop.addOption(String(i), String(i));
         }
