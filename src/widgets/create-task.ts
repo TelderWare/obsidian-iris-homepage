@@ -43,10 +43,28 @@ export class CreateTaskWidget extends BaseWidget {
     const dueInput = this.addField(pop, "Due", "tomorrow 3pm, next Friday…");
 
     const btn = pop.createEl("button", { cls: "iris-hp-task-submit", text: "Create" });
+    btn.disabled = true;
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.submit(titleInput, dueInput);
+      this.submit(titleInput, dueInput, btn);
+    });
+
+    titleInput.addEventListener("input", () => {
+      btn.disabled = titleInput.value.trim().length === 0;
+    });
+
+    const handleEnter = (e: KeyboardEvent, next: HTMLInputElement | null) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (next) next.focus();
+      else if (!btn.disabled) this.submit(titleInput, dueInput, btn);
+    };
+    titleInput.addEventListener("keydown", (e) => handleEnter(e, dueInput));
+    dueInput.addEventListener("keydown", (e) => handleEnter(e, null));
+
+    pop.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); this.closePopover(); }
     });
 
     pop.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -72,37 +90,60 @@ export class CreateTaskWidget extends BaseWidget {
     return input;
   }
 
+  private submitting = false;
+
   private async submit(
     titleInput: HTMLInputElement,
     dueInput: HTMLInputElement,
+    btn: HTMLButtonElement,
   ): Promise<void> {
+    if (this.submitting) return;
     const title = titleInput.value.trim();
     if (!title) { new Notice("Task title is required"); return; }
 
-    const lines = ["---"];
-    const raw = dueInput.value.trim();
-    if (raw) {
-      const due = await this.parseDate(raw);
-      if (!due) { new Notice("Couldn't understand that date"); return; }
-      lines.push(`closes: ${due.date}`);
-      if (due.time) lines.push(`closeTime: "${due.time}"`);
+    this.submitting = true;
+    const originalText = btn.textContent ?? "Create";
+    btn.disabled = true;
+    btn.setText("Creating…");
+    titleInput.disabled = true;
+    dueInput.disabled = true;
+
+    try {
+      const lines = ["---"];
+      const raw = dueInput.value.trim();
+      if (raw) {
+        const due = await this.parseDate(raw);
+        if (!due) {
+          new Notice("Couldn't understand that date");
+          btn.setText(originalText);
+          btn.disabled = false;
+          titleInput.disabled = false;
+          dueInput.disabled = false;
+          dueInput.focus();
+          return;
+        }
+        lines.push(`closes: ${due.date}`);
+        if (due.time) lines.push(`closeTime: "${due.time}"`);
+      }
+      lines.push(`displayTitle: "${title}"`);
+      lines.push("status: ", "---", "");
+
+      await this.ensureFolder();
+
+      const safeName = title.replace(/[\\/:*?"<>|]/g, "_");
+      let path = `${this.plugin.settings.taskFolder}/${safeName}.md`;
+      if (this.app.vault.getAbstractFileByPath(path)) {
+        let i = 1;
+        while (this.app.vault.getAbstractFileByPath(`${this.plugin.settings.taskFolder}/${safeName} ${i}.md`)) i++;
+        path = `${this.plugin.settings.taskFolder}/${safeName} ${i}.md`;
+      }
+
+      await this.app.vault.create(path, lines.join("\n"));
+      new Notice(`Task "${title}" created`);
+      this.closePopover();
+    } finally {
+      this.submitting = false;
     }
-    lines.push(`displayTitle: "${title}"`);
-    lines.push("status: ", "---", "");
-
-    await this.ensureFolder();
-
-    const safeName = title.replace(/[\\/:*?"<>|]/g, "_");
-    let path = `${this.plugin.settings.taskFolder}/${safeName}.md`;
-    if (this.app.vault.getAbstractFileByPath(path)) {
-      let i = 1;
-      while (this.app.vault.getAbstractFileByPath(`${this.plugin.settings.taskFolder}/${safeName} ${i}.md`)) i++;
-      path = `${this.plugin.settings.taskFolder}/${safeName} ${i}.md`;
-    }
-
-    await this.app.vault.create(path, lines.join("\n"));
-    new Notice(`Task "${title}" created`);
-    this.closePopover();
   }
 
   private closePopover(): void {
