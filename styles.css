@@ -714,11 +714,11 @@
   justify-content: center;
   gap: 4px;
   padding: 0 10px !important;
-  position: relative;
   overflow: visible !important;
 }
 
 .iris-hp-switcher-input-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -772,6 +772,10 @@
 
 .iris-hp-widget:has(.iris-hp-switcher-body) {
   overflow: visible;
+}
+
+.iris-hp-widget-wrapper:has(.iris-hp-switcher-results:not(:empty)) {
+  z-index: 100;
 }
 
 .iris-hp-switcher-results::-webkit-scrollbar {

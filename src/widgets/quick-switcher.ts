@@ -28,7 +28,7 @@ export class QuickSwitcherWidget extends BaseWidget {
       attr: { type: "text", placeholder: "Search..." },
     });
 
-    const results = this.bodyEl.createDiv({ cls: "iris-hp-switcher-results" });
+    const results = inputRow.createDiv({ cls: "iris-hp-switcher-results" });
 
     input.addEventListener("input", () => {
       if (this.searchTimer) clearTimeout(this.searchTimer);
