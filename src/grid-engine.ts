@@ -8,13 +8,19 @@ function cellKey(row: number, col: number): number {
 
 export class GridEngine {
   private columns: number;
+  private rows: number; // 0 = unlimited
 
-  constructor(columns: number) {
+  constructor(columns: number, rows = 0) {
     this.columns = columns;
+    this.rows = rows;
   }
 
   setColumns(columns: number): void {
     this.columns = columns;
+  }
+
+  setRows(rows: number): void {
+    this.rows = rows;
   }
 
   buildOccupancyMap(widgets: WidgetConfig[], excludeId?: string): Map<number, string> {
@@ -38,6 +44,7 @@ export class GridEngine {
     height: number
   ): boolean {
     if (col < 0 || row < 0 || col + width > this.columns) return false;
+    if (this.rows > 0 && row + height > this.rows) return false;
     for (let r = row; r < row + height; r++) {
       for (let c = col; c < col + width; c++) {
         if (map.has(cellKey(r, c))) return false;
@@ -85,6 +92,12 @@ export class GridEngine {
     widget.width = Math.min(widget.width, this.columns);
     widget.width = Math.max(widget.width, 1);
     widget.height = Math.max(widget.height, 1);
+    if (this.rows > 0) {
+      widget.height = Math.min(widget.height, this.rows);
+      if (widget.row + widget.height > this.rows) {
+        widget.row = this.rows - widget.height;
+      }
+    }
     if (widget.col + widget.width > this.columns) {
       widget.col = this.columns - widget.width;
     }
@@ -94,7 +107,7 @@ export class GridEngine {
 
   findFirstAvailable(widgets: WidgetConfig[], width: number, height: number): { col: number; row: number } {
     const map = this.buildOccupancyMap(widgets);
-    const maxRow = this.getMaxRow(widgets) + 2;
+    const maxRow = this.rows > 0 ? this.rows - height : this.getMaxRow(widgets) + 2;
     for (let row = 0; row <= maxRow; row++) {
       for (let col = 0; col <= this.columns - width; col++) {
         if (this.canPlaceWithMap(map, col, row, width, height)) {
@@ -102,7 +115,8 @@ export class GridEngine {
         }
       }
     }
-    return { col: 0, row: maxRow + 1 };
+    // Fallback: place at the bottom (may overflow if rows is fixed, but avoids data loss)
+    return { col: 0, row: (this.rows > 0 ? this.rows : maxRow + 1) };
   }
 
   resolveCollisions(widgets: WidgetConfig[], movedWidget: WidgetConfig): void {
@@ -122,6 +136,9 @@ export class GridEngine {
       const w = widgets.find((w) => w.id === id);
       if (!w) continue;
       w.row = movedWidget.row + movedWidget.height;
+      if (this.rows > 0 && w.row + w.height > this.rows) {
+        w.height = Math.max(1, this.rows - w.row);
+      }
     }
 
     // Only compact the displaced widgets, not everything on the board

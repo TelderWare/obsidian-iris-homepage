@@ -72,6 +72,12 @@ export class HomepageView extends ItemView {
   render(): void {
     if (this.placingCleanup) this.placingCleanup();
     this.engine.setColumns(this.plugin.settings.columns);
+    this.engine.setRows(this.plugin.settings.rows);
+    // Clamp all widgets to fit within the current grid bounds
+    for (const w of this.plugin.settings.widgets) {
+      this.engine.clamp(w);
+    }
+    this.engine.compact(this.plugin.settings.widgets);
     this.widgetInstances.forEach((w) => w.destroy());
     this.widgetInstances.clear();
 
@@ -329,7 +335,8 @@ export class HomepageView extends ItemView {
       }
 
       const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - result.width));
-      const row = Math.max(0, cell.row);
+      const placeMaxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - result.height : Infinity;
+      const row = Math.max(0, Math.min(cell.row, placeMaxRow));
       this.setGridPos(this.ghostEl, col, row, result.width, result.height);
     };
 
@@ -399,7 +406,8 @@ export class HomepageView extends ItemView {
   private addWidgetAt(result: PickerResult, col: number, row: number): void {
     const { width, height } = result;
     const clampedCol = Math.max(0, Math.min(col, this.plugin.settings.columns - width));
-    const clampedRow = Math.max(0, row);
+    const addMaxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - height : Infinity;
+    const clampedRow = Math.max(0, Math.min(row, addMaxRow));
 
     const config: WidgetConfig = {
       id: crypto.randomUUID(),
@@ -469,7 +477,8 @@ export class HomepageView extends ItemView {
       const oldPositions = this.snapshotPositions(gridEl);
 
       widget.col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
-      widget.row = Math.max(0, cell.row - this.dragOffsetRow);
+      const maxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - widget.height : Infinity;
+      widget.row = Math.max(0, Math.min(cell.row - this.dragOffsetRow, maxRow));
       this.engine.clamp(widget);
       this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
       this.draggedWidgetId = null;
@@ -583,6 +592,9 @@ export class HomepageView extends ItemView {
       }
 
       w = Math.min(w, this.plugin.settings.columns - col);
+      if (this.plugin.settings.rows > 0) {
+        h = Math.min(h, this.plugin.settings.rows - row);
+      }
       return { col, row, w, h };
     };
 
@@ -627,7 +639,8 @@ export class HomepageView extends ItemView {
     }
 
     const col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
-    const row = Math.max(0, cell.row - this.dragOffsetRow);
+    const ghostMaxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - widget.height : Infinity;
+    const row = Math.max(0, Math.min(cell.row - this.dragOffsetRow, ghostMaxRow));
     this.setGridPos(this.ghostEl, col, row, widget.width, widget.height);
   }
 
