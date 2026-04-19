@@ -25,7 +25,7 @@ export class QuickSwitcherWidget extends BaseWidget {
 
     const input = inputRow.createEl("input", {
       cls: "iris-hp-switcher-input",
-      attr: { type: "text", placeholder: "Search..." },
+      attr: { type: "text", placeholder: "Search or create..." },
     });
 
     const results = inputRow.createDiv({ cls: "iris-hp-switcher-results" });
@@ -84,30 +84,65 @@ export class QuickSwitcherWidget extends BaseWidget {
 
     if (!query) return;
 
-    const scored: { file: TFile; score: number }[] = [];
+    const scored: { file: TFile; score: number; matchedAlias: string | null }[] = [];
 
     for (const f of this.app.vault.getMarkdownFiles()) {
       if (this.hiddenFilter(f.path)) continue;
 
       let best = this.fuzzyScore(query, f.basename);
+      let matchedAlias: string | null = null;
 
-      const aliases: string[] = this.app.metadataCache.getFileCache(f)?.frontmatter?.aliases ?? [];
+      const rawAliases = this.app.metadataCache.getFileCache(f)?.frontmatter?.aliases;
+      const aliases: string[] = Array.isArray(rawAliases)
+        ? rawAliases
+        : typeof rawAliases === "string"
+          ? [rawAliases]
+          : [];
       for (const alias of aliases) {
         const s = this.fuzzyScore(query, alias);
-        if (s > best) best = s;
+        if (s > best) {
+          best = s;
+          matchedAlias = alias;
+        }
       }
 
-      if (best > -1) scored.push({ file: f, score: best });
+      if (best > -1) scored.push({ file: f, score: best, matchedAlias });
     }
 
     scored.sort((a, b) => b.score - a.score || a.file.basename.localeCompare(b.file.basename));
 
-    for (const { file } of scored.slice(0, 20)) {
+    const exactExists = scored.some(
+      (s) => s.file.basename.toLowerCase() === query.toLowerCase()
+    );
+
+    if (!exactExists) {
+      const createItem = container.createDiv({ cls: "iris-hp-switcher-item iris-hp-switcher-create" });
+      const iconEl = createItem.createSpan({ cls: "iris-hp-switcher-create-icon" });
+      setIcon(iconEl, "plus");
+      createItem.createSpan({ text: `Create "${query}"` });
+
+      createItem.addEventListener("click", async () => {
+        const path = `${query}.md`;
+        let file = this.app.vault.getAbstractFileByPath(path);
+        if (!file) file = await this.app.vault.create(path, "");
+        if (file instanceof TFile) {
+          this.app.workspace.getLeaf(false).openFile(file);
+        }
+        const input = this.bodyEl.querySelector(".iris-hp-switcher-input") as HTMLInputElement | null;
+        if (input) input.value = "";
+        container.empty();
+      });
+    }
+
+    for (const { file, matchedAlias } of scored.slice(0, 20)) {
       const item = container.createDiv({ cls: "iris-hp-switcher-item" });
-      item.createSpan({ text: getDisplayTitle(this.app, file) });
+      item.createSpan({ text: matchedAlias ?? getDisplayTitle(this.app, file) });
 
       item.addEventListener("click", () => {
         this.app.workspace.getLeaf(false).openFile(file);
+        const input = this.bodyEl.querySelector(".iris-hp-switcher-input") as HTMLInputElement | null;
+        if (input) input.value = "";
+        container.empty();
       });
     }
   }

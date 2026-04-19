@@ -7,8 +7,6 @@ import { buildHiddenFilter, getDisplayTitle } from "../utils";
 export class RecentNotesWidget extends BaseWidget {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private eventRef: EventRef | null = null;
-  private resizeObserver: ResizeObserver | null = null;
-  private lastHeight = 0;
   private hiddenFilter: (path: string) => boolean;
 
   constructor(app: App, containerEl: HTMLElement, config: WidgetConfig, plugin: IrisHomepagePlugin) {
@@ -16,35 +14,20 @@ export class RecentNotesWidget extends BaseWidget {
 
     this.hiddenFilter = buildHiddenFilter(this.app);
 
-    this.eventRef = this.app.vault.on("modify", () => {
+    this.eventRef = this.app.workspace.on("active-leaf-change", () => {
       if (this.debounceTimer) clearTimeout(this.debounceTimer);
-      this.debounceTimer = setTimeout(() => this.render(), 1000);
+      this.debounceTimer = setTimeout(() => this.render(), 500);
     });
-
-    this.resizeObserver = new ResizeObserver(() => {
-      const h = this.bodyEl.clientHeight;
-      if (Math.abs(h - this.lastHeight) < 4) return;
-      this.lastHeight = h;
-      this.render();
-    });
-    this.resizeObserver.observe(this.bodyEl);
 
     this.render();
   }
 
   render(): void {
-    this.bodyEl.empty();
+    this.clearBody();
 
     const files = this.getRecentFiles();
 
-    // Estimate how many items fit: each item is roughly 1 line-height + 12px padding
-    const itemHeight = 32; // ~20px text + 12px padding
-    const titleHeight = 28;
-    const available = (this.bodyEl.clientHeight || 200) - titleHeight;
-    const max = Math.max(1, Math.floor(available / itemHeight));
-    const displayed = files.slice(0, max);
-
-    if (displayed.length === 0) {
+    if (files.length === 0) {
       this.bodyEl.createDiv({ cls: "iris-hp-empty", text: "No recent notes" });
       return;
     }
@@ -52,7 +35,7 @@ export class RecentNotesWidget extends BaseWidget {
     this.bodyEl.createEl("h6", { cls: "iris-hp-widget-title", text: "Recent notes" });
     const listEl = this.bodyEl.createDiv({ cls: "iris-hp-list" });
 
-    for (const file of displayed) {
+    for (const file of files) {
       const item = listEl.createDiv({ cls: "iris-hp-list-item" });
       const self = item.createDiv({ cls: "iris-hp-list-item-self is-clickable" });
       const inner = self.createDiv({ cls: "iris-hp-list-item-inner" });
@@ -65,7 +48,7 @@ export class RecentNotesWidget extends BaseWidget {
   }
 
   private getRecentFiles(): TFile[] {
-    const recentPaths: string[] = (this.app.workspace as any).getLastOpenFiles?.() ?? [];
+    const recentPaths: string[] = this.plugin.settings.recentFiles ?? [];
     const files: TFile[] = [];
     for (const path of recentPaths) {
       const file = this.app.vault.getAbstractFileByPath(path);
@@ -77,13 +60,9 @@ export class RecentNotesWidget extends BaseWidget {
   }
 
   destroy(): void {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     if (this.eventRef) {
-      this.app.vault.offref(this.eventRef);
+      this.app.workspace.offref(this.eventRef);
       this.eventRef = null;
     }
     super.destroy();

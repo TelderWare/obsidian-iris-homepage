@@ -39,6 +39,24 @@ export abstract class BaseWidget {
 
   abstract render(): void;
 
+  /**
+   * Empty bodyEl while preserving its scroll position across a re-render.
+   * Subclasses should call this instead of `this.bodyEl.empty()` at the top
+   * of render(). Scroll restore is deferred to the next frame so async
+   * content has a chance to lay out.
+   */
+  protected clearBody(): void {
+    const prevScroll = this.bodyEl.scrollTop;
+    this.bodyEl.empty();
+    if (prevScroll > 0) {
+      requestAnimationFrame(() => {
+        if (this.bodyEl.scrollHeight > this.bodyEl.clientHeight) {
+          this.bodyEl.scrollTop = prevScroll;
+        }
+      });
+    }
+  }
+
   destroy(): void {
     this.containerEl.empty();
   }

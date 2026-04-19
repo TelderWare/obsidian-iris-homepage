@@ -1,4 +1,4 @@
-import { App, MarkdownRenderer, TFile, FuzzySuggestModal, setIcon, EventRef } from "obsidian";
+import { App, MarkdownRenderer, TFile, FuzzySuggestModal, EventRef } from "obsidian";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
@@ -44,7 +44,7 @@ export class EmbeddedNoteWidget extends BaseWidget {
   }
 
   render(): void {
-    this.bodyEl.empty();
+    this.clearBody();
 
     if (!this.config.notePath) {
       this.renderPicker();
@@ -58,15 +58,6 @@ export class EmbeddedNoteWidget extends BaseWidget {
     }
 
     const contentEl = this.bodyEl.createDiv({ cls: "iris-hp-embedded-content" });
-
-    const openBtn = this.bodyEl.createEl("button", {
-      cls: "iris-hp-embedded-open clickable-icon",
-      attr: { "aria-label": "Open note" },
-    });
-    setIcon(openBtn, "external-link");
-    openBtn.addEventListener("click", () => {
-      this.app.workspace.getLeaf(false).openFile(file);
-    });
 
     this.app.vault.cachedRead(file).then((content) => {
       MarkdownRenderer.render(this.app, content, contentEl, file.path, this.plugin);

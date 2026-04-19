@@ -122,6 +122,7 @@ export class WidgetPickerModal extends Modal {
 
       for (const viewType of viewByType.keys()) {
         if (HIDDEN_VIEW_TYPES.has(viewType)) continue;
+        if (CORE_VIEW_TYPES.has(viewType)) continue;
         if (Object.prototype.hasOwnProperty.call(BUILTIN_WIDGETS, viewType)) continue;
 
         entries.push({

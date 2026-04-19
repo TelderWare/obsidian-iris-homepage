@@ -2,6 +2,7 @@ import { App, FuzzySuggestModal, setIcon } from "obsidian";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 import { BaseWidget } from "./base-widget";
+import { IconSuggestModal } from "../icon-picker";
 
 interface ObsidianCommand {
   id: string;
@@ -46,6 +47,20 @@ export class CommandWidget extends BaseWidget {
       this.openCommandPicker();
     });
 
+    const iconBtn = this.containerEl.createEl("button", {
+      cls: "iris-hp-widget-configure iris-hp-widget-configure-icon clickable-icon",
+      attr: { "aria-label": "Set icon" },
+    });
+    setIcon(iconBtn, "image");
+    iconBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      new IconSuggestModal(this.app, (icon) => {
+        this.config.icon = icon;
+        this.plugin.saveSettings();
+        this.render();
+      }).open();
+    });
+
     this.render();
   }
 
@@ -69,7 +84,7 @@ export class CommandWidget extends BaseWidget {
     });
 
     const icon = btn.createDiv({ cls: "iris-hp-command-icon" });
-    setIcon(icon, cmd?.icon ?? "terminal");
+    setIcon(icon, this.config.icon ?? cmd?.icon ?? "terminal");
 
     btn.createDiv({ cls: "iris-hp-command-label", text: label });
 

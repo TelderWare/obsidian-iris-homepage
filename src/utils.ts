@@ -19,9 +19,15 @@ export function setApiKey(app: App, value: string): void {
 
 export function buildHiddenFilter(app: App): (path: string) => boolean {
   const patterns: string[] = (app.vault as any).config?.userIgnoreFilters ?? [];
-  if (patterns.length === 0) return () => false;
   const regexes = patterns.map((p) => { try { return new RegExp(p); } catch { return null; } }).filter(Boolean) as RegExp[];
-  return (path: string) => regexes.some((re) => re.test(path));
+  const isUserIgnored: ((path: string) => boolean) | undefined =
+    (app.metadataCache as any).isUserIgnored?.bind(app.metadataCache);
+  return (path: string) => {
+    // Dot-prefixed path segments are hidden by Obsidian/the OS.
+    if (path.split("/").some((seg) => seg.startsWith("."))) return true;
+    if (isUserIgnored && isUserIgnored(path)) return true;
+    return regexes.some((re) => re.test(path));
+  };
 }
 
 export function getDisplayTitle(app: App, file: TFile): string {

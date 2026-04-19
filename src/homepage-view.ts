@@ -11,6 +11,7 @@ import { NewNoteWidget } from "./widgets/new-note";
 import { CreateTaskWidget } from "./widgets/create-task";
 import { CommandWidget } from "./widgets/command";
 import { QuickSwitcherWidget } from "./widgets/quick-switcher";
+import { OpenUrlWidget } from "./widgets/open-url";
 import { ViewEmbedWidget } from "./widgets/view-embed";
 import { WidgetPickerModal } from "./widget-picker";
 import type { PickerResult } from "./widget-picker";
@@ -69,10 +70,6 @@ export class HomepageView extends ItemView {
     this.widgetInstances.clear();
   }
 
-  private get rowHeight(): number {
-    return this.plugin.settings.rowHeight;
-  }
-
   private get gridGap(): number {
     return this.plugin.settings.gridGap;
   }
@@ -85,7 +82,6 @@ export class HomepageView extends ItemView {
     for (const w of this.plugin.settings.widgets) {
       this.engine.clamp(w);
     }
-    this.engine.compact(this.plugin.settings.widgets);
     this.widgetInstances.forEach((w) => w.destroy());
     this.widgetInstances.clear();
 
@@ -123,11 +119,11 @@ export class HomepageView extends ItemView {
   private applyGridTemplate(gridEl: HTMLElement): void {
     gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
     const fixedRows = this.plugin.settings.rows;
-    if (fixedRows > 0) {
-      gridEl.style.gridTemplateRows = `repeat(${fixedRows}, ${this.rowHeight}px)`;
-    } else {
-      gridEl.style.gridAutoRows = `${this.rowHeight}px`;
-    }
+    const rowCount = fixedRows > 0
+      ? fixedRows
+      : Math.max(this.engine.getMaxRow(this.plugin.settings.widgets) + 1, 1);
+    gridEl.style.gridTemplateRows = `repeat(${rowCount}, 1fr)`;
+    gridEl.style.gridAutoRows = "";
     gridEl.style.gap = `${this.gridGap}px`;
   }
 
@@ -139,10 +135,7 @@ export class HomepageView extends ItemView {
     const cols = this.plugin.settings.columns;
     const fixedRows = this.plugin.settings.rows;
     const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
-    const rootStyle = getComputedStyle(this.contentEl);
-    const rootPadding = parseFloat(rootStyle.paddingTop) + parseFloat(rootStyle.paddingBottom);
-    const viewportRows = Math.floor((this.contentEl.clientHeight - rootPadding) / (this.rowHeight + this.gridGap));
-    const rows = fixedRows > 0 ? fixedRows : Math.max(maxRow + 2, viewportRows);
+    const rows = fixedRows > 0 ? fixedRows : Math.max(maxRow + 2, 1);
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const dot = gridEl.createDiv({ cls: "iris-hp-grid-dot" });
@@ -196,63 +189,6 @@ export class HomepageView extends ItemView {
     this.render();
   }
 
-  private shuffleLayout(): void {
-    this.pushUndo();
-    const widgets = this.plugin.settings.widgets;
-    const cols = this.plugin.settings.columns;
-
-    // Fisher-Yates shuffle the placement order
-    for (let i = widgets.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [widgets[i], widgets[j]] = [widgets[j], widgets[i]];
-    }
-
-    // Compute a tight row bound: the minimum rows needed if all widgets were packed perfectly
-    const fixedRows = this.plugin.settings.rows;
-    const totalCellArea = widgets.reduce((sum, w) => sum + w.width * w.height, 0);
-    const packedRows = Math.ceil(totalCellArea / cols);
-    const rowBound = fixedRows > 0 ? fixedRows : Math.max(packedRows, 4);
-
-    // Place each widget at a random valid position
-    const placed: WidgetConfig[] = [];
-    for (const w of widgets) {
-      const map = this.engine.buildOccupancyMap(placed);
-
-      // Collect all valid positions within the bound
-      const candidates: { col: number; row: number }[] = [];
-      for (let r = 0; r <= rowBound - w.height; r++) {
-        for (let c = 0; c <= cols - w.width; c++) {
-          let fits = true;
-          for (let dr = 0; dr < w.height && fits; dr++) {
-            for (let dc = 0; dc < w.width && fits; dc++) {
-              if (map.has((r + dr) * 32 + (c + dc))) fits = false;
-            }
-          }
-          if (fits) candidates.push({ col: c, row: r });
-        }
-      }
-
-      if (candidates.length > 0) {
-        const pick = candidates[Math.floor(Math.random() * candidates.length)];
-        w.col = pick.col;
-        w.row = pick.row;
-      } else {
-        // Fallback: place below everything
-        const pos = this.engine.findFirstAvailable(placed, w.width, w.height);
-        w.col = pos.col;
-        w.row = pos.row;
-      }
-      placed.push(w);
-    }
-
-    this.plugin.saveData(this.plugin.settings);
-    if (this.gridEl) {
-      const oldPositions = this.snapshotPositions(this.gridEl);
-      this.updateLayout();
-      this.animateReflow(this.gridEl, oldPositions);
-    }
-  }
-
   private renderToolbar(root: HTMLElement): void {
     const toolbar = root.createDiv({ cls: "iris-hp-toolbar" });
 
@@ -282,13 +218,6 @@ export class HomepageView extends ItemView {
       setIcon(redoBtn, "redo");
       redoBtn.toggleClass("iris-hp-toolbar-btn-disabled", this.redoStack.length === 0);
       redoBtn.addEventListener("click", () => this.redo());
-
-      const shuffleBtn = toolbar.createEl("button", {
-        cls: "iris-hp-toolbar-btn clickable-icon",
-        attr: { "aria-label": "Shuffle layout" },
-      });
-      setIcon(shuffleBtn, "shuffle");
-      shuffleBtn.addEventListener("click", () => this.shuffleLayout());
 
       const addBtn = toolbar.createEl("button", {
         cls: "iris-hp-toolbar-btn clickable-icon",
@@ -326,7 +255,6 @@ export class HomepageView extends ItemView {
           this.pushUndo();
           const oldPositions = this.snapshotPositions(gridEl);
           this.plugin.settings.widgets.splice(idx, 1);
-          this.engine.compact(this.plugin.settings.widgets);
           this.updateLayout();
           this.animateReflow(gridEl, oldPositions);
           this.plugin.saveData(this.plugin.settings);
@@ -386,10 +314,20 @@ export class HomepageView extends ItemView {
         this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
       }
 
-      const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - result.width));
-      const placeMaxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - result.height : Infinity;
-      const row = Math.max(0, Math.min(cell.row, placeMaxRow));
-      this.setGridPos(this.ghostEl, col, row, result.width, result.height);
+      const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - 1));
+      const row = Math.max(0, cell.row);
+      const fit = this.engine.fitAt(
+        this.plugin.settings.widgets, col, row, result.width, result.height
+      );
+
+      if (fit) {
+        this.ghostEl.removeClass("iris-hp-drop-ghost-invalid");
+        this.setGridPos(this.ghostEl, col, row, fit.width, fit.height);
+      } else {
+        // Cell is occupied — show a 1×1 invalid ghost so the cursor is still tracked
+        this.ghostEl.addClass("iris-hp-drop-ghost-invalid");
+        this.setGridPos(this.ghostEl, col, row, 1, 1);
+      }
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -448,6 +386,8 @@ export class HomepageView extends ItemView {
           return new CommandWidget(this.app, wrapper, config, this.plugin);
         case "quick-switcher":
           return new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
+        case "open-url":
+          return new OpenUrlWidget(this.app, wrapper, config, this.plugin);
         case "iris-tasks-view":
           return new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
       }
@@ -456,22 +396,24 @@ export class HomepageView extends ItemView {
   }
 
   private addWidgetAt(result: PickerResult, col: number, row: number): void {
-    const { width, height } = result;
-    const clampedCol = Math.max(0, Math.min(col, this.plugin.settings.columns - width));
-    const addMaxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - height : Infinity;
-    const clampedRow = Math.max(0, Math.min(row, addMaxRow));
+    const fit = this.engine.fitAt(
+      this.plugin.settings.widgets, col, row, result.width, result.height
+    );
+    if (!fit) return; // cell occupied, nothing to place
 
     const config: WidgetConfig = {
       id: crypto.randomUUID(),
       type: result.type,
-      col: clampedCol,
-      row: clampedRow,
-      width,
-      height,
+      col,
+      row,
+      width: fit.width,
+      height: fit.height,
     };
 
     this.pushUndo();
     this.plugin.settings.widgets.push(config);
+    // fitAt guarantees no overlap, so resolveCollisions is only needed as a
+    // safety net (e.g. if the grid changed between ghost preview and click).
     this.engine.resolveCollisions(this.plugin.settings.widgets, config);
     this.plugin.saveSettings();
     this.render();
@@ -555,7 +497,7 @@ export class HomepageView extends ItemView {
       if (!cell) return;
 
       if (this.pendingWidget) {
-        const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - this.pendingWidget.width));
+        const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - 1));
         const row = Math.max(0, cell.row);
         const result = this.pendingWidget;
         if (this.placingCleanup) this.placingCleanup();
@@ -711,9 +653,14 @@ export class HomepageView extends ItemView {
   }
 
   private getCellSize(gridRect: DOMRect): { cellW: number; cellH: number } {
+    const cols = this.plugin.settings.columns;
+    const fixedRows = this.plugin.settings.rows;
+    const rowCount = fixedRows > 0
+      ? fixedRows
+      : Math.max(this.engine.getMaxRow(this.plugin.settings.widgets) + 1, 1);
     return {
-      cellW: (gridRect.width - this.gridGap * (this.plugin.settings.columns - 1)) / this.plugin.settings.columns,
-      cellH: this.rowHeight,
+      cellW: (gridRect.width - this.gridGap * (cols - 1)) / cols,
+      cellH: (gridRect.height - this.gridGap * (rowCount - 1)) / rowCount,
     };
   }
 

@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import type { IrisHomepageSettings } from "./types";
 import { VIEW_TYPE_HOMEPAGE, DEFAULT_SETTINGS } from "./constants";
 import { HomepageView } from "./homepage-view";
@@ -8,6 +8,7 @@ export default class IrisHomepagePlugin extends Plugin {
   settings: IrisHomepageSettings = DEFAULT_SETTINGS;
   private isReplacingTab = false;
   private hideEmptyStyleEl: HTMLStyleElement | null = null;
+  private recentSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -34,6 +35,16 @@ export default class IrisHomepagePlugin extends Plugin {
       this.app.workspace.on("layout-change", () => {
         if (this.settings.replaceNewTab) {
           this.replaceEmptyTabs();
+        }
+      })
+    );
+
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (!leaf) return;
+        const file = (leaf.view as any)?.file;
+        if (file instanceof TFile && file.extension === "md") {
+          this.trackRecentFile(file.path);
         }
       })
     );
@@ -78,14 +89,20 @@ export default class IrisHomepagePlugin extends Plugin {
       this.settings.gridVersion = 4;
     }
 
-    // Migration: v5 added configurable rowHeight and gridGap.
+    // Migration: v5 added configurable gridGap. (rowHeight was removed in v6
+    // since rows now stretch to fill the view.)
     if (this.settings.gridVersion < 5) {
-      this.settings.rowHeight ??= 60;
       this.settings.gridGap ??= 12;
       this.settings.gridVersion = 5;
     }
 
-    if (!data?.gridVersion || data.gridVersion < 5) {
+    // Migration: v6 removed the rowHeight setting — rows are fractional now.
+    if (this.settings.gridVersion < 6) {
+      delete (this.settings as unknown as { rowHeight?: number }).rowHeight;
+      this.settings.gridVersion = 6;
+    }
+
+    if (!data?.gridVersion || data.gridVersion < 6) {
       await this.saveData(this.settings);
     }
   }
@@ -104,12 +121,6 @@ export default class IrisHomepagePlugin extends Plugin {
   }
 
   async activateView(): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_HOMEPAGE);
-    if (existing.length > 0) {
-      this.app.workspace.revealLeaf(existing[0]);
-      return;
-    }
-
     const leaf = this.app.workspace.getLeaf(true);
     await leaf.setViewState({ type: VIEW_TYPE_HOMEPAGE, active: true });
     this.app.workspace.revealLeaf(leaf);
@@ -126,12 +137,27 @@ export default class IrisHomepagePlugin extends Plugin {
     }
   }
 
+  private trackRecentFile(path: string): void {
+    const list = this.settings.recentFiles ??= [];
+    const idx = list.indexOf(path);
+    if (idx === 0) return;
+    if (idx > 0) list.splice(idx, 1);
+    list.unshift(path);
+    if (list.length > 50) list.length = 50;
+
+    // Debounce persistence so rapid tab switches don't spam disk
+    if (this.recentSaveTimer) clearTimeout(this.recentSaveTimer);
+    this.recentSaveTimer = setTimeout(() => this.saveData(this.settings), 2000);
+  }
+
   private replaceEmptyTabs(): void {
     if (this.isReplacingTab) return;
     this.isReplacingTab = true;
 
     try {
       const emptyLeaves = this.app.workspace.getLeavesOfType("empty");
+      if (emptyLeaves.length === 0) return;
+
       for (const leaf of emptyLeaves) {
         leaf.setViewState({ type: VIEW_TYPE_HOMEPAGE, active: true });
       }

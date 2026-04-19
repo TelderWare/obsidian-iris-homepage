@@ -52,20 +52,6 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Row height")
-      .setDesc("Height of each grid row in pixels (30-120)")
-      .addSlider((slider) =>
-        slider
-          .setLimits(30, 120, 5)
-          .setValue(this.plugin.settings.rowHeight)
-          .setDynamicTooltip()
-          .onChange(async (val) => {
-            this.plugin.settings.rowHeight = val;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
       .setName("Grid gap")
       .setDesc("Spacing between widgets in pixels (0-32)")
       .addSlider((slider) =>

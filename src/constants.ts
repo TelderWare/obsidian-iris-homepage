@@ -1,13 +1,11 @@
 import type { IrisHomepageSettings, BuiltinWidgetType } from "./types";
 
 export const VIEW_TYPE_HOMEPAGE = "iris-homepage-view";
-export const ROW_HEIGHT = 60;
 export const GRID_GAP = 12;
 
 export const DEFAULT_SETTINGS: IrisHomepageSettings = {
   columns: 8,
   rows: 0,
-  rowHeight: ROW_HEIGHT,
   gridGap: GRID_GAP,
   widgets: [
     {
@@ -33,6 +31,7 @@ export const BUILTIN_WIDGETS: Record<BuiltinWidgetType, { label: string; icon: s
   "command": { label: "Command", icon: "terminal", width: 2, height: 2 },
   "quick-switcher": { label: "Quick Switcher", icon: "search", width: 8, height: 1 },
   "iris-tasks-view": { label: "Tasks", icon: "list-checks", width: 4, height: 6 },
+  "open-url": { label: "Open URL", icon: "link", width: 2, height: 2 },
 };
 
 export const HIDDEN_VIEW_TYPES = new Set([

@@ -4,6 +4,9 @@
   margin: 0;
   height: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 /* ─── Empty state ─── */
@@ -38,8 +41,24 @@
   bottom: 36px;
   right: 20px;
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
   z-index: 100;
+}
+
+.iris-hp-toolbar-row {
+  display: flex;
+  gap: 6px;
+}
+
+.iris-hp-toolbar-row-grid {
+  opacity: 0.9;
+}
+
+.iris-hp-toolbar-btn-active {
+  outline: 2px solid var(--text-on-accent);
+  outline-offset: -4px;
 }
 
 .iris-hp-toolbar-btn {
@@ -81,6 +100,8 @@
 .iris-hp-grid {
   display: grid;
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* ─── Edit-mode grid dots ─── */
@@ -98,11 +119,11 @@
 
 .iris-hp-grid-dot::after {
   content: "";
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--text-faint);
-  opacity: 0.35;
+  background: var(--text-muted);
+  opacity: 0.55;
 }
 
 /* ─── Widget wrapper ─── */
@@ -120,11 +141,7 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
   overflow: hidden;
-  transition: box-shadow 0.15s ease, opacity 0.15s ease;
-}
-
-.iris-hp-widget:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: opacity 0.15s ease;
 }
 
 .iris-hp-widget-wrapper.iris-hp-dragging {
@@ -198,6 +215,26 @@
   display: flex;
 }
 
+.iris-hp-widget-configure-icon {
+  right: 36px;
+}
+
+.iris-hp-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+  color: var(--text-normal);
+}
+
+.iris-hp-icon-suggest-icon {
+  display: inline-flex;
+  margin-left: 8px;
+  color: var(--text-muted);
+}
+
 /* ─── Trash drop zone (edit-mode) ─── */
 .iris-hp-trash-zone {
   position: fixed;
@@ -220,6 +257,7 @@
 .iris-hp-trash-zone svg {
   width: 20px;
   height: 20px;
+  pointer-events: none;
 }
 
 .iris-hp-trash-zone.iris-hp-trash-hover {
@@ -227,6 +265,14 @@
   border-color: rgba(220, 38, 38, 0.6);
   color: rgba(220, 38, 38, 1);
   transform: translateX(-50%) scale(1.1);
+}
+
+.iris-hp-trash-zone.iris-hp-trash-arming {
+  background: rgba(220, 38, 38, 0.25);
+  border-color: rgba(220, 38, 38, 0.8);
+  color: rgba(220, 38, 38, 1);
+  transform: translateX(-50%) scale(1.15);
+  transition: all 0.7s ease;
 }
 
 /* ─── Widget body ─── */
@@ -291,15 +337,15 @@
   z-index: 10;
 }
 
+.iris-hp-drop-ghost.iris-hp-drop-ghost-invalid {
+  background: rgba(220, 38, 38, 0.4);
+  opacity: 0.3;
+}
+
 /* ─── Borderless mode ─── */
 .iris-hp-borderless .iris-hp-widget {
   background: transparent;
   border-color: transparent;
-  box-shadow: none;
-}
-
-.iris-hp-borderless .iris-hp-widget:hover {
-  box-shadow: none;
 }
 
 /* ─── Shared list styles (recent notes, tasks, etc.) ─── */
@@ -634,6 +680,7 @@
 
 .iris-hp-widget-wrapper:has(.iris-hp-task-popover) {
   overflow: visible !important;
+  z-index: 100;
 }
 
 .iris-hp-widget:has(.iris-hp-task-popover) {
@@ -642,11 +689,11 @@
 
 .iris-hp-task-popover {
   position: absolute;
-  top: 100%;
+  top: 0;
   left: 0;
   z-index: 200;
   min-width: 240px;
-  margin-top: 6px;
+  width: 100%;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -655,13 +702,12 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
 }
 
 .iris-hp-task-popover-above {
   top: auto;
-  bottom: 100%;
-  margin-top: 0;
-  margin-bottom: 6px;
+  bottom: 0;
 }
 
 .iris-hp-task-field {
@@ -754,8 +800,9 @@
 
 .iris-hp-switcher-results {
   position: absolute;
-  top: 100%;
-  left: 0;
+  top: calc(100% + 3px);
+  /* Align with the input box, not the leading search icon (16px icon + 6px gap). */
+  left: 22px;
   right: 0;
   max-height: 240px;
   overflow-y: auto;
@@ -795,6 +842,23 @@
 
 .iris-hp-switcher-item:hover {
   background: var(--background-modifier-hover);
+}
+
+.iris-hp-switcher-create {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+.iris-hp-switcher-create-icon {
+  display: flex;
+  align-items: center;
+}
+
+.iris-hp-switcher-create-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* ─── Widget error boundary ─── */
