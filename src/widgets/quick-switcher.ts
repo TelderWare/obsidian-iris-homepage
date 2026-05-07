@@ -116,13 +116,14 @@ export class QuickSwitcherWidget extends BaseWidget {
     );
 
     if (!exactExists) {
+      const titleCased = query.replace(/(^|\s)\w/g, (c) => c.toUpperCase());
       const createItem = container.createDiv({ cls: "iris-hp-switcher-item iris-hp-switcher-create" });
       const iconEl = createItem.createSpan({ cls: "iris-hp-switcher-create-icon" });
       setIcon(iconEl, "plus");
-      createItem.createSpan({ text: `Create "${query}"` });
+      createItem.createSpan({ text: `Create "${titleCased}"` });
 
       createItem.addEventListener("click", async () => {
-        const path = `${query}.md`;
+        const path = `${titleCased}.md`;
         let file = this.app.vault.getAbstractFileByPath(path);
         if (!file) file = await this.app.vault.create(path, "");
         if (file instanceof TFile) {

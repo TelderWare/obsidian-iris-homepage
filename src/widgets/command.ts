@@ -10,6 +10,20 @@ interface ObsidianCommand {
   icon?: string;
 }
 
+/**
+ * Obsidian commands follow a "<Plugin name>: <Command name>" convention.
+ * On the homepage the source plugin is noise — the user picked the command
+ * once and the icon already conveys identity. Strip the prefix so the tile
+ * just reads "Manage workspaces" instead of "Workspaces: Manage workspaces".
+ *
+ * Only the *first* ": " is treated as the separator so commands whose own
+ * name contains a colon (rare but possible) survive intact.
+ */
+function stripCommandPrefix(name: string): string {
+  const idx = name.indexOf(": ");
+  return idx === -1 ? name : name.slice(idx + 2);
+}
+
 class CommandSuggestModal extends FuzzySuggestModal<ObsidianCommand> {
   private commands: ObsidianCommand[];
   private onChoose: (cmd: ObsidianCommand) => void;
@@ -76,7 +90,13 @@ export class CommandWidget extends BaseWidget {
     }
 
     const cmd = this.getCommand(this.config.commandId);
-    const label = cmd?.name ?? this.config.commandId;
+    const label = stripCommandPrefix(cmd?.name ?? this.config.commandId);
+
+    // A meaningful icon (user-chosen override or one supplied by the
+    // command itself) carries the identity on its own — adding the text
+    // label is redundant. Only show the label when we'd otherwise be
+    // falling back to the generic "terminal" placeholder.
+    const hasMeaningfulIcon = !!(this.config.icon ?? cmd?.icon);
 
     const btn = this.bodyEl.createDiv({
       cls: "iris-hp-command",
@@ -86,7 +106,9 @@ export class CommandWidget extends BaseWidget {
     const icon = btn.createDiv({ cls: "iris-hp-command-icon" });
     setIcon(icon, this.config.icon ?? cmd?.icon ?? "terminal");
 
-    btn.createDiv({ cls: "iris-hp-command-label", text: label });
+    if (!hasMeaningfulIcon) {
+      btn.createDiv({ cls: "iris-hp-command-label", text: label });
+    }
 
     btn.addEventListener("click", () => {
       (this.app as any).commands.executeCommandById(this.config.commandId);

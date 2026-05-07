@@ -1,33 +1,158 @@
 import { PluginSettingTab, App, Setting } from "obsidian";
 import type IrisHomepagePlugin from "./main";
+import type { Homepage } from "./types";
 import { resolveWidgetLabel } from "./constants";
 import { GridEngine } from "./grid-engine";
-import { getApiKey, setApiKey } from "./utils";
+import { getWorkspacesPlugin, getAllWorkspaceNames } from "./workspace-binder";
 
 export class IrisHomepageSettingsTab extends PluginSettingTab {
   private plugin: IrisHomepagePlugin;
+  private selectedWorkspaceName: string | null = null;
 
   constructor(app: App, plugin: IrisHomepagePlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
 
+  /** All workspace names worth showing: live workspaces ∪ stored configs ∪ active. */
+  private listKnownWorkspaces(): string[] {
+    const set = new Set<string>(getAllWorkspaceNames(this.app));
+    for (const name of Object.keys(this.plugin.settings.homepages)) set.add(name);
+    set.add(this.plugin.getCurrentWorkspaceName());
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }
+
+  private getSelectedHomepage(): Homepage {
+    const known = this.listKnownWorkspaces();
+    if (this.selectedWorkspaceName && known.includes(this.selectedWorkspaceName)) {
+      return this.plugin.getHomepage(this.selectedWorkspaceName);
+    }
+    const fallback = this.plugin.getCurrentWorkspaceName();
+    this.selectedWorkspaceName = fallback;
+    return this.plugin.getHomepage(fallback);
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
+    this.renderGlobalSection(containerEl);
+    this.renderHomepagesSection(containerEl);
+    this.renderSelectedHomepageSection(containerEl);
+  }
+
+  private renderGlobalSection(containerEl: HTMLElement): void {
     containerEl.createEl("h2", { text: "General" });
 
     new Setting(containerEl)
-      .setName("Grid columns")
-      .setDesc("Number of columns in the widget grid (2-16)")
+      .setName("Open on startup")
+      .setDesc("Show the default homepage when Obsidian starts")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.openOnStartup).onChange(async (val) => {
+          this.plugin.settings.openOnStartup = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Replace new tabs")
+      .setDesc("Open the default homepage instead of an empty new tab")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.replaceNewTab).onChange(async (val) => {
+          this.plugin.settings.replaceNewTab = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Borderless widgets")
+      .setDesc("Remove borders and backgrounds from widget cards on every homepage")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.borderless).onChange(async (val) => {
+          this.plugin.settings.borderless = val;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+
+    if (!this.plugin.settings.borderless) {
+      new Setting(containerEl)
+        .setName("Border width")
+        .setDesc("Widget border thickness in pixels")
+        .addSlider((slider) =>
+          slider
+            .setLimits(0, 4, 1)
+            .setValue(this.plugin.settings.borderWidth)
+            .setDynamicTooltip()
+            .onChange(async (val) => {
+              this.plugin.settings.borderWidth = val;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+  }
+
+  private renderHomepagesSection(containerEl: HTMLElement): void {
+    containerEl.createEl("h2", { text: "Homepages" });
+
+    const wsEnabled = !!getWorkspacesPlugin(this.app);
+    if (!wsEnabled) {
+      const notice = containerEl.createDiv({ cls: "setting-item-description" });
+      notice.setText(
+        "Homepages follow Obsidian's core Workspaces plugin. Enable Settings → Core plugins → Workspaces to manage multiple homepages.",
+      );
+    } else {
+      const notice = containerEl.createDiv({ cls: "setting-item-description" });
+      notice.setText(
+        "Each saved workspace gets its own homepage layout. Add or remove homepages by adding or removing workspaces in the core Workspaces plugin.",
+      );
+    }
+
+    const selected = this.getSelectedHomepage();
+    const known = this.listKnownWorkspaces();
+
+    new Setting(containerEl)
+      .setName("Edit homepage for workspace")
+      .setDesc("Pick which workspace's homepage layout to configure below")
       .addDropdown((drop) => {
-        for (let i = 2; i <= 16; i++) {
-          drop.addOption(String(i * 2), String(i));
+        for (const name of known) {
+          drop.addOption(name, name);
         }
-        drop.setValue(String(this.plugin.settings.columns));
+        drop.setValue(selected.workspaceName);
+        drop.onChange((val) => {
+          this.selectedWorkspaceName = val;
+          this.display();
+        });
+      });
+
+    const currentName = this.plugin.getCurrentWorkspaceName();
+    for (const name of known) {
+      const cfg = this.plugin.settings.homepages[name];
+      const isCurrent = name === currentName;
+      new Setting(containerEl)
+        .setName(name + (isCurrent ? " (active)" : ""))
+        .setDesc(
+          cfg
+            ? `${cfg.widgets.length} widget${cfg.widgets.length === 1 ? "" : "s"}`
+            : "No layout yet — will be created on first visit",
+        );
+    }
+  }
+
+  private renderSelectedHomepageSection(containerEl: HTMLElement): void {
+    const hp = this.getSelectedHomepage();
+    containerEl.createEl("h2", { text: `"${hp.workspaceName}" layout` });
+
+    new Setting(containerEl)
+      .setName("Grid columns")
+      .setDesc("Number of columns in the widget grid (4-32)")
+      .addDropdown((drop) => {
+        for (let i = 4; i <= 32; i++) {
+          drop.addOption(String(i), String(i));
+        }
+        drop.setValue(String(hp.columns));
         drop.onChange(async (val) => {
-          this.plugin.settings.columns = parseInt(val, 10);
+          hp.columns = parseInt(val, 10);
           await this.plugin.saveSettings();
         });
       });
@@ -36,17 +161,17 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       .setName("Grid rows")
       .setDesc("Number of rows in the widget grid (0 = auto-grow)")
       .addDropdown((drop) => {
-        const engine = new GridEngine(this.plugin.settings.columns, this.plugin.settings.rows);
-        const currentRows = this.plugin.settings.widgets.length > 0
-          ? engine.getMaxRow(this.plugin.settings.widgets) + 1
+        const engine = new GridEngine(hp.columns, hp.rows);
+        const currentRows = hp.widgets.length > 0
+          ? engine.getMaxRow(hp.widgets) + 1
           : 0;
         drop.addOption("0", `Auto (${currentRows})`);
         for (let i = 2; i <= 24; i++) {
           drop.addOption(String(i), String(i));
         }
-        drop.setValue(String(this.plugin.settings.rows));
+        drop.setValue(String(hp.rows));
         drop.onChange(async (val) => {
-          this.plugin.settings.rows = parseInt(val, 10);
+          hp.rows = parseInt(val, 10);
           await this.plugin.saveSettings();
         });
       });
@@ -57,99 +182,18 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
       .addSlider((slider) =>
         slider
           .setLimits(0, 32, 2)
-          .setValue(this.plugin.settings.gridGap)
+          .setValue(hp.gridGap)
           .setDynamicTooltip()
           .onChange(async (val) => {
-            this.plugin.settings.gridGap = val;
+            hp.gridGap = val;
             await this.plugin.saveSettings();
           })
       );
 
-    new Setting(containerEl)
-      .setName("Open on startup")
-      .setDesc("Show the homepage when Obsidian starts")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.openOnStartup).onChange(async (val) => {
-          this.plugin.settings.openOnStartup = val;
-          await this.plugin.saveSettings();
-        })
-      );
+    containerEl.createEl("h3", { text: "Widgets" });
 
-    new Setting(containerEl)
-      .setName("Replace new tabs")
-      .setDesc("Open the homepage instead of an empty new tab")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.replaceNewTab).onChange(async (val) => {
-          this.plugin.settings.replaceNewTab = val;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Borderless widgets")
-      .setDesc("Remove borders and backgrounds from widget cards")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.borderless).onChange(async (val) => {
-          this.plugin.settings.borderless = val;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Task folder")
-      .setDesc("Folder where new tasks are created")
-      .addText((text) =>
-        text
-          .setPlaceholder("Tasks")
-          .setValue(this.plugin.settings.taskFolder)
-          .onChange(async (val) => {
-            this.plugin.settings.taskFolder = val.trim() || "Tasks";
-            await this.plugin.saveSettings();
-          })
-      );
-
-    containerEl.createEl("h2", { text: "AI" });
-
-    const apiKeySetting = new Setting(containerEl)
-      .setName("Anthropic API key")
-      .setDesc("Used as a fallback for natural language date parsing when chrono-node can't interpret the input");
-
-    const existingKey = getApiKey(this.app);
-
-    apiKeySetting.addText((text) => {
-      text
-        .setPlaceholder(existingKey ? "••••••••" : "sk-ant-…")
-        .onChange(() => {});
-      const inputEl = text.inputEl;
-      inputEl.type = "password";
-      inputEl.style.width = "220px";
-
-      apiKeySetting.addButton((btn) =>
-        btn.setButtonText("Save").onClick(async () => {
-          const val = inputEl.value.trim();
-          if (val) {
-            setApiKey(this.app, val);
-            inputEl.value = "";
-            inputEl.placeholder = "••••••••";
-          }
-        })
-      );
-
-      if (existingKey) {
-        apiKeySetting.addButton((btn) =>
-          btn.setButtonText("Clear").setWarning().onClick(async () => {
-            setApiKey(this.app, "");
-            inputEl.placeholder = "sk-ant-…";
-            inputEl.value = "";
-          })
-        );
-      }
-    });
-
-    containerEl.createEl("h2", { text: "Widgets" });
-
-    for (let i = 0; i < this.plugin.settings.widgets.length; i++) {
-      const config = this.plugin.settings.widgets[i];
+    for (let i = 0; i < hp.widgets.length; i++) {
+      const config = hp.widgets[i];
       const label = resolveWidgetLabel(config.type);
 
       new Setting(containerEl)
@@ -160,7 +204,7 @@ export class IrisHomepageSettingsTab extends PluginSettingTab {
             .setButtonText("Remove")
             .setWarning()
             .onClick(async () => {
-              this.plugin.settings.widgets.splice(i, 1);
+              hp.widgets.splice(i, 1);
               await this.plugin.saveSettings();
               this.display();
             })

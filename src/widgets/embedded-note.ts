@@ -57,7 +57,15 @@ export class EmbeddedNoteWidget extends BaseWidget {
       return;
     }
 
-    const contentEl = this.bodyEl.createDiv({ cls: "iris-hp-embedded-content" });
+    // Render into a proper Obsidian markdown surface. The classes
+    // `markdown-preview-view markdown-rendered` are what the core reading
+    // view uses, so the theme's calibrated styling for task lists,
+    // headings, code blocks, callouts, etc. applies natively. Without
+    // these, MarkdownRenderer drops bare HTML into an unstyled div and
+    // we end up patching individual misalignments by hand.
+    const contentEl = this.bodyEl.createDiv({
+      cls: "iris-hp-embedded-content markdown-preview-view markdown-rendered",
+    });
 
     this.app.vault.cachedRead(file).then((content) => {
       MarkdownRenderer.render(this.app, content, contentEl, file.path, this.plugin);

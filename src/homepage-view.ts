@@ -1,26 +1,22 @@
-import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Notice, ViewStateResult, WorkspaceLeaf, setIcon } from "obsidian";
 import type IrisHomepagePlugin from "./main";
-import type { WidgetConfig } from "./types";
-import { isBuiltinWidget } from "./types";
+import type { Homepage, WidgetConfig } from "./types";
 import { VIEW_TYPE_HOMEPAGE } from "./constants";
+import { getWorkspacesPlugin, getAllWorkspaceNames } from "./workspace-binder";
 import { GridEngine } from "./grid-engine";
 import { BaseWidget } from "./widgets/base-widget";
-import { RecentNotesWidget } from "./widgets/recent-notes";
-import { EmbeddedNoteWidget } from "./widgets/embedded-note";
-import { NewNoteWidget } from "./widgets/new-note";
-import { CreateTaskWidget } from "./widgets/create-task";
-import { CommandWidget } from "./widgets/command";
-import { QuickSwitcherWidget } from "./widgets/quick-switcher";
-import { OpenUrlWidget } from "./widgets/open-url";
-import { ViewEmbedWidget } from "./widgets/view-embed";
 import { WidgetPickerModal } from "./widget-picker";
 import type { PickerResult } from "./widget-picker";
-
-const EMPTY_DRAG_IMG = new Image();
-EMPTY_DRAG_IMG.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
-
+import { createWidget } from "./widget-factory";
+import { UndoManager } from "./undo-manager";
+import { snapshotPositions, animateReflow } from "./reflow-animator";
+import { setGridPos, getCellSize } from "./grid-geometry";
+import { renderTrashZone, renderDoneButton } from "./toolbar";
+import { startResize } from "./resize-controller";
+import { attachGridListeners } from "./drag-controller";
 
 export class HomepageView extends ItemView {
+  navigation = true;
   private plugin: IrisHomepagePlugin;
   private engine: GridEngine;
   private widgetInstances: Map<string, BaseWidget> = new Map();
@@ -29,17 +25,24 @@ export class HomepageView extends ItemView {
   private dragOffsetCol = 0;
   private dragOffsetRow = 0;
   private gridEl: HTMLElement | null = null;
-  private ghostEl: HTMLElement | null = null;
   private pendingWidget: PickerResult | null = null;
   private placingCleanup: (() => void) | null = null;
-  private undoStack: string[] = [];
-  private redoStack: string[] = [];
-  private static readonly MAX_UNDO = 50;
+  private placingGhostEl: HTMLElement | null = null;
+  private undoMgr = new UndoManager(50);
 
   constructor(leaf: WorkspaceLeaf, plugin: IrisHomepagePlugin) {
     super(leaf);
     this.plugin = plugin;
-    this.engine = new GridEngine(plugin.settings.columns);
+    this.engine = new GridEngine(this.hp.columns);
+  }
+
+  /**
+   * Current homepage being rendered — always reflects the *active* workspace.
+   * The view doesn't store its own workspace; switching workspaces (via the
+   * core plugin or our switcher) flips what this returns.
+   */
+  get hp(): Homepage {
+    return this.plugin.getHomepage();
   }
 
   getViewType(): string {
@@ -47,15 +50,45 @@ export class HomepageView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Home";
+    return "Homepage";
   }
 
   getIcon(): string {
-    return "home";
+    return this.hp.icon ?? "home";
+  }
+
+  async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    await super.setState(state, result);
+    if (this.gridEl) this.render();
+  }
+
+  /**
+   * Switch the active Obsidian workspace. Every open homepage view (including
+   * this one) follows because they always read the active workspace. The
+   * load may replace the layout entirely — that's intentional.
+   */
+  async switchHomepage(workspaceName: string): Promise<void> {
+    if (workspaceName === this.hp.workspaceName) return;
+    this.editMode = false;
+    await this.plugin.switchToWorkspace(workspaceName);
   }
 
   async onOpen(): Promise<void> {
-    this.render();
+    // Never let anything in here escape — Obsidian awaits onOpen during
+    // workspace deserialization, and a throw here can leave the splash stuck
+    // on "Loading workspace…". Wraps addAction (icon name may not exist in
+    // older Obsidian builds), render(), and event registration.
+    try {
+      this.addAction("layout-grid", "Switch homepage", (e) => this.openSwitcherMenu(e));
+    } catch (err) {
+      console.error("[iris-homepage] HomepageView.addAction threw:", err);
+    }
+    try {
+      this.render();
+    } catch (err) {
+      console.error("[iris-homepage] HomepageView.render() threw on open:", err);
+      this.renderFatal(err);
+    }
 
     this.registerDomEvent(this.contentEl, "keydown", (e: KeyboardEvent) => {
       if (!this.editMode) return;
@@ -63,6 +96,93 @@ export class HomepageView extends ItemView {
       if (mod && e.key === "z" && !e.shiftKey) { e.preventDefault(); this.undo(); }
       else if (mod && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); this.redo(); }
     });
+
+    // In edit mode, .iris-hp-widget-body has pointer-events:none so left-click
+    // on widget content falls through to the wrapper for dragging. Right-click
+    // should still reach the widget, so its own contextmenu listeners (recent-
+    // notes filter, embedded-note markdown menu, etc.) keep working. Lift
+    // pointer-events on the body just long enough for the contextmenu event to
+    // hit-test against it; restore on the next tick.
+    this.registerDomEvent(this.contentEl, "mousedown", (e: MouseEvent) => {
+      if (!this.editMode || e.button !== 2) return;
+      const wrapper = (e.target as HTMLElement | null)?.closest<HTMLElement>(".iris-hp-widget-wrapper");
+      if (!wrapper) return;
+      const body = wrapper.querySelector<HTMLElement>(".iris-hp-widget-body");
+      if (!body) return;
+      body.style.pointerEvents = "auto";
+      window.setTimeout(() => { body.style.pointerEvents = ""; }, 0);
+    });
+
+    // Right-click: widget-specific menu on widgets, global action menu elsewhere.
+    this.registerDomEvent(this.contentEl, "contextmenu", (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(".iris-hp-trash-zone")) return;
+      const wrapper = target?.closest<HTMLElement>(".iris-hp-widget-wrapper");
+      if (wrapper) {
+        const widgetId = wrapper.dataset.widgetId;
+        const widget = widgetId ? this.widgetInstances.get(widgetId) : undefined;
+        if (!widget?.buildContextMenu) return; // no per-widget menu → let browser/widget handle it
+        e.preventDefault();
+        const menu = new Menu();
+        widget.buildContextMenu(menu);
+        menu.showAtMouseEvent(e);
+        return;
+      }
+      e.preventDefault();
+      // Out of edit mode, the action menu has only "Edit layout" — skip the
+      // menu and toggle directly. In edit mode there are more options
+      // (add widget, undo/redo), so the menu is still useful.
+      if (!this.editMode) {
+        this.editMode = true;
+        this.render();
+        return;
+      }
+      const menu = new Menu();
+      this.buildActionMenu(menu);
+      menu.showAtMouseEvent(e);
+    });
+  }
+
+  /** Populate a Menu with the edit/undo/redo/add actions shared between the pane menu and right-click. */
+  private buildActionMenu(menu: Menu): void {
+    menu.addItem((item) =>
+      item
+        .setTitle(this.editMode ? "Done editing" : "Edit layout")
+        .setIcon(this.editMode ? "check" : "pencil")
+        .onClick(() => {
+          this.editMode = !this.editMode;
+          this.render();
+        }),
+    );
+    if (this.editMode) {
+      menu.addItem((item) =>
+        item
+          .setTitle("Add widget")
+          .setIcon("plus")
+          .onClick(() => this.openPickerThenPlace()),
+      );
+      menu.addSeparator();
+      menu.addItem((item) =>
+        item
+          .setTitle("Undo")
+          .setIcon("undo")
+          .setDisabled(!this.undoMgr.canUndo())
+          .onClick(() => this.undo()),
+      );
+      menu.addItem((item) =>
+        item
+          .setTitle("Redo")
+          .setIcon("redo")
+          .setDisabled(!this.undoMgr.canRedo())
+          .onClick(() => this.redo()),
+      );
+    }
+  }
+
+  /** Extend the tab-header / more-options menu with homepage actions. */
+  onPaneMenu(menu: Menu, source: string): void {
+    super.onPaneMenu(menu, source);
+    this.buildActionMenu(menu);
   }
 
   async onClose(): Promise<void> {
@@ -70,16 +190,78 @@ export class HomepageView extends ItemView {
     this.widgetInstances.clear();
   }
 
+  /** Last-ditch placeholder shown when render() itself throws. Keeps the leaf
+   *  alive so workspace deserialization completes even if a widget is broken. */
+  private renderFatal(err: unknown): void {
+    const root = this.contentEl;
+    root.empty();
+    root.addClass("iris-hp-root");
+    const box = root.createDiv({ cls: "iris-hp-fatal" });
+    box.createEl("h3", { text: "Homepage failed to render" });
+    box.createEl("p", { text: "Open the developer console for the full error." });
+    const detail = box.createEl("pre");
+    detail.textContent = err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);
+  }
+
   private get gridGap(): number {
-    return this.plugin.settings.gridGap;
+    return this.hp.gridGap;
+  }
+
+  /** Effective row count used for cell-height math: fixed rows if set, else max-row + 1. */
+  private getEffectiveRowCount(): number {
+    const fixedRows = this.hp.rows;
+    return fixedRows > 0
+      ? fixedRows
+      : Math.max(this.engine.getMaxRow(this.hp.widgets) + 1, 1);
+  }
+
+  /**
+   * Measure the current cell size in pixels from the rendered grid element.
+   * Used to convert px-based widget size hints into grid-cell counts.
+   */
+  getCellSizePx(): { cellWidth: number; cellHeight: number } {
+    const gridEl = this.gridEl;
+    const cols = this.hp.columns;
+    const gap = this.gridGap;
+
+    let cellWidth = 0;
+    let cellHeight = 48;
+
+    if (gridEl) {
+      const gridWidth = gridEl.clientWidth;
+      if (gridWidth > 0 && cols > 0) {
+        cellWidth = Math.max(1, (gridWidth - gap * (cols - 1)) / cols);
+      }
+      const rowCount = this.getEffectiveRowCount();
+      const gridHeight = gridEl.clientHeight;
+      if (gridHeight > 0 && rowCount > 0) {
+        cellHeight = Math.max(1, (gridHeight - gap * (rowCount - 1)) / rowCount);
+      }
+    }
+
+    // Fallback when grid isn't mounted yet — use the content width as a hint.
+    if (cellWidth === 0) cellWidth = cellHeight;
+    return { cellWidth, cellHeight };
+  }
+
+  pxToCells(px: { width: number; height: number }): { width: number; height: number } {
+    const { cellWidth, cellHeight } = this.getCellSizePx();
+    const gap = this.gridGap;
+    const widthCells = Math.max(1, Math.round((px.width + gap) / (cellWidth + gap)));
+    const heightCells = Math.max(1, Math.round((px.height + gap) / (cellHeight + gap)));
+    const maxCols = Math.max(1, this.hp.columns);
+    return {
+      width: Math.min(widthCells, maxCols),
+      height: heightCells,
+    };
   }
 
   render(): void {
     if (this.placingCleanup) this.placingCleanup();
-    this.engine.setColumns(this.plugin.settings.columns);
-    this.engine.setRows(this.plugin.settings.rows);
+    this.engine.setColumns(this.hp.columns);
+    this.engine.setRows(this.hp.rows);
     // Clamp all widgets to fit within the current grid bounds
-    for (const w of this.plugin.settings.widgets) {
+    for (const w of this.hp.widgets) {
       this.engine.clamp(w);
     }
     this.widgetInstances.forEach((w) => w.destroy());
@@ -90,20 +272,21 @@ export class HomepageView extends ItemView {
     root.addClass("iris-hp-root");
     root.toggleClass("iris-hp-edit-mode", this.editMode);
     root.toggleClass("iris-hp-borderless", this.plugin.settings.borderless);
+    root.style.setProperty("--iris-hp-border-width", `${this.plugin.settings.borderWidth}px`);
 
     const gridEl = root.createDiv({ cls: "iris-hp-grid" });
     this.gridEl = gridEl;
     this.applyGridTemplate(gridEl);
 
-    for (const config of this.plugin.settings.widgets) {
+    for (const config of this.hp.widgets) {
       this.renderWidget(gridEl, config);
     }
 
-    if (this.plugin.settings.widgets.length === 0) {
+    if (this.hp.widgets.length === 0) {
       const hint = root.createDiv({ cls: "iris-hp-empty-state" });
       const icon = hint.createDiv({ cls: "iris-hp-empty-state-icon" });
-      setIcon(icon, "pencil");
-      hint.createEl("span", { text: "Click the pencil to get started" });
+      setIcon(icon, "mouse-pointer-click");
+      hint.createEl("span", { text: "Right-click anywhere to start building your homepage" });
     }
 
     if (this.editMode) {
@@ -112,17 +295,26 @@ export class HomepageView extends ItemView {
 
     this.attachGridListeners(gridEl);
 
-    this.renderToolbar(root);
+    if (this.editMode) {
+      renderTrashZone(root, {
+        getDraggedWidgetId: () => this.draggedWidgetId,
+        onTrashDrop: (widgetId) => {
+          this.draggedWidgetId = null;
+          const trashEl = root.querySelector<HTMLElement>(".iris-hp-trash-zone");
+          if (trashEl) this.deleteWidgetAnimated(widgetId, trashEl);
+        },
+      });
+      renderDoneButton(root, () => {
+        this.editMode = false;
+        this.render();
+      });
+    }
   }
 
   /** Apply grid template styles (columns, rows, gap) to the grid element. */
   private applyGridTemplate(gridEl: HTMLElement): void {
-    gridEl.style.gridTemplateColumns = `repeat(${this.plugin.settings.columns}, 1fr)`;
-    const fixedRows = this.plugin.settings.rows;
-    const rowCount = fixedRows > 0
-      ? fixedRows
-      : Math.max(this.engine.getMaxRow(this.plugin.settings.widgets) + 1, 1);
-    gridEl.style.gridTemplateRows = `repeat(${rowCount}, 1fr)`;
+    gridEl.style.gridTemplateColumns = `repeat(${this.hp.columns}, 1fr)`;
+    gridEl.style.gridTemplateRows = `repeat(${this.getEffectiveRowCount()}, 1fr)`;
     gridEl.style.gridAutoRows = "";
     gridEl.style.gap = `${this.gridGap}px`;
   }
@@ -132,9 +324,9 @@ export class HomepageView extends ItemView {
     // Remove existing dots
     gridEl.querySelectorAll(".iris-hp-grid-dot").forEach((el) => el.remove());
 
-    const cols = this.plugin.settings.columns;
-    const fixedRows = this.plugin.settings.rows;
-    const maxRow = this.engine.getMaxRow(this.plugin.settings.widgets);
+    const cols = this.hp.columns;
+    const fixedRows = this.hp.rows;
+    const maxRow = this.engine.getMaxRow(this.hp.widgets);
     const rows = fixedRows > 0 ? fixedRows : Math.max(maxRow + 2, 1);
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -152,12 +344,12 @@ export class HomepageView extends ItemView {
 
     this.applyGridTemplate(gridEl);
 
-    for (const config of this.plugin.settings.widgets) {
+    for (const config of this.hp.widgets) {
       const wrapper = gridEl.querySelector<HTMLElement>(
         `.iris-hp-widget-wrapper[data-widget-id="${config.id}"]`
       );
       if (wrapper) {
-        this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
+        setGridPos(wrapper, config.col, config.row, config.width, config.height);
       }
     }
 
@@ -168,133 +360,124 @@ export class HomepageView extends ItemView {
 
   /** Save a snapshot of the current widget layout onto the undo stack. Call BEFORE mutating. */
   private pushUndo(): void {
-    this.undoStack.push(JSON.stringify(this.plugin.settings.widgets));
-    if (this.undoStack.length > HomepageView.MAX_UNDO) this.undoStack.shift();
-    this.redoStack.length = 0;
+    this.undoMgr.push(this.hp.widgets);
   }
 
   private undo(): void {
-    if (this.undoStack.length === 0) return;
-    this.redoStack.push(JSON.stringify(this.plugin.settings.widgets));
-    this.plugin.settings.widgets = JSON.parse(this.undoStack.pop()!);
+    const next = this.undoMgr.undo(this.hp.widgets);
+    if (!next) return;
+    this.hp.widgets = next;
     this.plugin.saveData(this.plugin.settings);
     this.render();
   }
 
   private redo(): void {
-    if (this.redoStack.length === 0) return;
-    this.undoStack.push(JSON.stringify(this.plugin.settings.widgets));
-    this.plugin.settings.widgets = JSON.parse(this.redoStack.pop()!);
+    const next = this.undoMgr.redo(this.hp.widgets);
+    if (!next) return;
+    this.hp.widgets = next;
     this.plugin.saveData(this.plugin.settings);
     this.render();
   }
 
-  private renderToolbar(root: HTMLElement): void {
-    const toolbar = root.createDiv({ cls: "iris-hp-toolbar" });
+  /** Animated delete: fly the wrapper toward the trash, then remove + reflow. */
+  private deleteWidgetAnimated(widgetId: string, trashEl: HTMLElement): void {
+    const gridEl = this.gridEl;
+    if (!gridEl) return;
 
-    const editBtn = toolbar.createEl("button", {
-      cls: "iris-hp-toolbar-btn clickable-icon",
-      attr: { "aria-label": this.editMode ? "Done editing" : "Edit layout" },
-    });
-    setIcon(editBtn, this.editMode ? "check" : "pencil");
-    editBtn.addEventListener("click", () => {
-      this.editMode = !this.editMode;
-      this.render();
-    });
+    const removeFromSettings = () => {
+      const idx = this.hp.widgets.findIndex((w) => w.id === widgetId);
+      if (idx === -1) return;
+      this.pushUndo();
+      const oldPositions = snapshotPositions(gridEl);
+      this.hp.widgets.splice(idx, 1);
+      this.updateLayout();
+      animateReflow(gridEl, oldPositions);
+      this.plugin.saveData(this.plugin.settings);
+    };
 
-    if (this.editMode) {
-      const undoBtn = toolbar.createEl("button", {
-        cls: "iris-hp-toolbar-btn clickable-icon",
-        attr: { "aria-label": "Undo" },
-      });
-      setIcon(undoBtn, "undo");
-      undoBtn.toggleClass("iris-hp-toolbar-btn-disabled", this.undoStack.length === 0);
-      undoBtn.addEventListener("click", () => this.undo());
+    const wrapper = gridEl.querySelector<HTMLElement>(
+      `.iris-hp-widget-wrapper[data-widget-id="${widgetId}"]`
+    );
 
-      const redoBtn = toolbar.createEl("button", {
-        cls: "iris-hp-toolbar-btn clickable-icon",
-        attr: { "aria-label": "Redo" },
-      });
-      setIcon(redoBtn, "redo");
-      redoBtn.toggleClass("iris-hp-toolbar-btn-disabled", this.redoStack.length === 0);
-      redoBtn.addEventListener("click", () => this.redo());
+    if (!wrapper) {
+      removeFromSettings();
+      return;
+    }
 
-      const addBtn = toolbar.createEl("button", {
-        cls: "iris-hp-toolbar-btn clickable-icon",
-        attr: { "aria-label": "Add widget" },
-      });
-      setIcon(addBtn, "plus");
-      addBtn.addEventListener("click", () => this.openPickerThenPlace());
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const trashRect = trashEl.getBoundingClientRect();
+    const dx = trashRect.left + trashRect.width / 2 - (wrapperRect.left + wrapperRect.width / 2);
+    const dy = trashRect.top + trashRect.height / 2 - (wrapperRect.top + wrapperRect.height / 2);
 
-      // Trash drop zone
-      const trash = root.createDiv({ cls: "iris-hp-trash-zone" });
-      setIcon(trash, "trash-2");
+    wrapper.style.transition = "transform 0.25s ease, opacity 0.25s ease";
+    wrapper.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+    wrapper.style.opacity = "0";
+    wrapper.style.zIndex = "200";
 
-      trash.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-        trash.addClass("iris-hp-trash-hover");
-      });
+    let deleted = false;
+    const doDelete = () => { if (!deleted) { deleted = true; wrapper.remove(); removeFromSettings(); } };
+    wrapper.addEventListener("transitionend", doDelete, { once: true });
+    setTimeout(doDelete, 350);
+  }
 
-      trash.addEventListener("dragleave", () => {
-        trash.removeClass("iris-hp-trash-hover");
-      });
+  private openSwitcherMenu(e: MouseEvent): void {
+    const menu = new Menu();
+    const ws = getWorkspacesPlugin(this.app);
+    const currentName = this.hp.workspaceName;
 
-      trash.addEventListener("drop", (e) => {
-        e.preventDefault();
-        trash.removeClass("iris-hp-trash-hover");
-        if (!this.draggedWidgetId || !this.gridEl) return;
+    if (!ws) {
+      menu.addItem((item) =>
+        item
+          .setTitle("Enable core Workspaces plugin to switch homepages")
+          .setIcon("alert-triangle")
+          .setDisabled(true),
+      );
+      menu.showAtMouseEvent(e);
+      return;
+    }
 
-        const widgetId = this.draggedWidgetId;
-        const gridEl = this.gridEl;
-        this.draggedWidgetId = null;
-
-        const deleteWidget = () => {
-          const idx = this.plugin.settings.widgets.findIndex((w) => w.id === widgetId);
-          if (idx === -1) return;
-          this.pushUndo();
-          const oldPositions = this.snapshotPositions(gridEl);
-          this.plugin.settings.widgets.splice(idx, 1);
-          this.updateLayout();
-          this.animateReflow(gridEl, oldPositions);
-          this.plugin.saveData(this.plugin.settings);
-        };
-
-        const wrapper = gridEl.querySelector<HTMLElement>(
-          `.iris-hp-widget-wrapper[data-widget-id="${widgetId}"]`
-        );
-
-        if (wrapper) {
-          const wrapperRect = wrapper.getBoundingClientRect();
-          const trashRect = trash.getBoundingClientRect();
-          const dx = trashRect.left + trashRect.width / 2 - (wrapperRect.left + wrapperRect.width / 2);
-          const dy = trashRect.top + trashRect.height / 2 - (wrapperRect.top + wrapperRect.height / 2);
-
-          wrapper.style.transition = "transform 0.25s ease, opacity 0.25s ease";
-          wrapper.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
-          wrapper.style.opacity = "0";
-          wrapper.style.zIndex = "200";
-
-          let deleted = false;
-          const doDelete = () => { if (!deleted) { deleted = true; wrapper.remove(); deleteWidget(); } };
-          wrapper.addEventListener("transitionend", doDelete, { once: true });
-          setTimeout(doDelete, 350);
-        } else {
-          deleteWidget();
-        }
+    const names = getAllWorkspaceNames(this.app).slice().sort((a, b) => a.localeCompare(b));
+    if (names.length === 0) {
+      menu.addItem((item) =>
+        item
+          .setTitle("No workspaces saved yet")
+          .setIcon("info")
+          .setDisabled(true),
+      );
+    }
+    for (const name of names) {
+      const cfg = this.plugin.settings.homepages[name];
+      menu.addItem((item) => {
+        item
+          .setTitle(name)
+          .setIcon(cfg?.icon ?? "home")
+          .setChecked(name === currentName)
+          .onClick(() => this.switchHomepage(name));
       });
     }
+    menu.addSeparator();
+    menu.addItem((item) =>
+      item
+        .setTitle("Manage workspaces…")
+        .setIcon("layout-grid")
+        .onClick(() => {
+          // Open the core Workspaces management modal via its command.
+          const ok = (this.app as any).commands?.executeCommandById?.("workspaces:manage");
+          if (!ok) new Notice("Open Settings → Workspaces to add or remove workspaces.");
+        }),
+    );
+    menu.showAtMouseEvent(e);
   }
 
   private async openPickerThenPlace(): Promise<void> {
-    const modal = new WidgetPickerModal(this.app);
+    const modal = new WidgetPickerModal(this.app, this.plugin, this);
     const result = await modal.open();
     if (!result || !this.gridEl) return;
     this.enterPlacingMode(result);
   }
 
   private async openPickerAt(col: number, row: number): Promise<void> {
-    const modal = new WidgetPickerModal(this.app);
+    const modal = new WidgetPickerModal(this.app, this.plugin, this);
     const result = await modal.open();
     if (!result) return;
     this.addWidgetAt(result, col, row);
@@ -310,23 +493,23 @@ export class HomepageView extends ItemView {
       const cell = this.getCellFromEvent(gridEl, e);
       if (!cell) return;
 
-      if (!this.ghostEl) {
-        this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
+      if (!this.placingGhostEl) {
+        this.placingGhostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
       }
 
-      const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - 1));
+      const col = Math.max(0, Math.min(cell.col, this.hp.columns - 1));
       const row = Math.max(0, cell.row);
       const fit = this.engine.fitAt(
-        this.plugin.settings.widgets, col, row, result.width, result.height
+        this.hp.widgets, col, row, result.width, result.height
       );
 
       if (fit) {
-        this.ghostEl.removeClass("iris-hp-drop-ghost-invalid");
-        this.setGridPos(this.ghostEl, col, row, fit.width, fit.height);
+        this.placingGhostEl.removeClass("iris-hp-drop-ghost-invalid");
+        setGridPos(this.placingGhostEl, col, row, fit.width, fit.height);
       } else {
         // Cell is occupied — show a 1×1 invalid ghost so the cursor is still tracked
-        this.ghostEl.addClass("iris-hp-drop-ghost-invalid");
-        this.setGridPos(this.ghostEl, col, row, 1, 1);
+        this.placingGhostEl.addClass("iris-hp-drop-ghost-invalid");
+        setGridPos(this.placingGhostEl, col, row, 1, 1);
       }
     };
 
@@ -340,7 +523,10 @@ export class HomepageView extends ItemView {
     const cleanup = () => {
       this.pendingWidget = null;
       this.contentEl.removeClass("iris-hp-placing");
-      this.removeGhost();
+      if (this.placingGhostEl) {
+        this.placingGhostEl.remove();
+        this.placingGhostEl = null;
+      }
       gridEl.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("keydown", onKeyDown);
       this.placingCleanup = null;
@@ -355,10 +541,10 @@ export class HomepageView extends ItemView {
     const wrapper = gridEl.createDiv({ cls: "iris-hp-widget-wrapper" });
     wrapper.dataset.widgetId = config.id;
     wrapper.setAttribute("draggable", "true");
-    this.setGridPos(wrapper, config.col, config.row, config.width, config.height);
+    setGridPos(wrapper, config.col, config.row, config.width, config.height);
 
     try {
-      const widget = this.createWidget(wrapper, config);
+      const widget = createWidget(this.app, wrapper, config, this.plugin);
       this.widgetInstances.set(config.id, widget);
     } catch (err) {
       console.error(`[iris-homepage] Failed to render widget "${config.type}" (${config.id}):`, err);
@@ -371,33 +557,9 @@ export class HomepageView extends ItemView {
     }
   }
 
-  private createWidget(wrapper: HTMLElement, config: WidgetConfig): BaseWidget {
-    if (isBuiltinWidget(config.type)) {
-      switch (config.type) {
-        case "recent-notes":
-          return new RecentNotesWidget(this.app, wrapper, config, this.plugin);
-        case "embedded-note":
-          return new EmbeddedNoteWidget(this.app, wrapper, config, this.plugin);
-        case "new-note":
-          return new NewNoteWidget(this.app, wrapper, config, this.plugin);
-        case "new-task":
-          return new CreateTaskWidget(this.app, wrapper, config, this.plugin);
-        case "command":
-          return new CommandWidget(this.app, wrapper, config, this.plugin);
-        case "quick-switcher":
-          return new QuickSwitcherWidget(this.app, wrapper, config, this.plugin);
-        case "open-url":
-          return new OpenUrlWidget(this.app, wrapper, config, this.plugin);
-        case "iris-tasks-view":
-          return new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
-      }
-    }
-    return new ViewEmbedWidget(this.app, wrapper, config, this.plugin);
-  }
-
   private addWidgetAt(result: PickerResult, col: number, row: number): void {
     const fit = this.engine.fitAt(
-      this.plugin.settings.widgets, col, row, result.width, result.height
+      this.hp.widgets, col, row, result.width, result.height
     );
     if (!fit) return; // cell occupied, nothing to place
 
@@ -411,303 +573,69 @@ export class HomepageView extends ItemView {
     };
 
     this.pushUndo();
-    this.plugin.settings.widgets.push(config);
+    this.hp.widgets.push(config);
     // fitAt guarantees no overlap, so resolveCollisions is only needed as a
     // safety net (e.g. if the grid changed between ghost preview and click).
-    this.engine.resolveCollisions(this.plugin.settings.widgets, config);
+    this.engine.resolveCollisions(this.hp.widgets, config);
     this.plugin.saveSettings();
     this.render();
   }
 
   private attachGridListeners(gridEl: HTMLElement): void {
-    gridEl.addEventListener("dragstart", (e) => {
-      if (!this.editMode) {
-        e.preventDefault();
-        return;
-      }
-      const wrapper = (e.target as HTMLElement).closest(".iris-hp-widget-wrapper") as HTMLElement | null;
-      if (!wrapper) return;
-      this.draggedWidgetId = wrapper.dataset.widgetId || null;
-      if (this.draggedWidgetId && e.dataTransfer) {
-        const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
-        const cell = this.getCellFromEvent(gridEl, e);
-        if (widget && cell) {
-          this.dragOffsetCol = cell.col - widget.col;
-          this.dragOffsetRow = cell.row - widget.row;
-        } else {
-          this.dragOffsetCol = 0;
-          this.dragOffsetRow = 0;
-        }
-        e.dataTransfer.setData("text/plain", this.draggedWidgetId);
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setDragImage(EMPTY_DRAG_IMG, 0, 0);
-        wrapper.addClass("iris-hp-dragging");
-      }
-    });
-
-    gridEl.addEventListener("dragover", (e) => {
-      if (!this.editMode || !this.draggedWidgetId) return;
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-      this.updateGhost(gridEl, e);
-    });
-
-    gridEl.addEventListener("dragleave", () => {
-      this.removeGhost();
-    });
-
-    gridEl.addEventListener("drop", (e) => {
-      e.preventDefault();
-      this.removeGhost();
-      if (!this.draggedWidgetId) return;
-
-      const cell = this.getCellFromEvent(gridEl, e);
-      if (!cell) return;
-
-      const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
-      if (!widget) return;
-
-      this.pushUndo();
-      const oldPositions = this.snapshotPositions(gridEl);
-
-      widget.col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
-      const maxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - widget.height : Infinity;
-      widget.row = Math.max(0, Math.min(cell.row - this.dragOffsetRow, maxRow));
-      this.engine.clamp(widget);
-      this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
-      this.draggedWidgetId = null;
-
-      this.updateLayout();
-      this.animateReflow(gridEl, oldPositions);
-      this.plugin.saveData(this.plugin.settings);
-    });
-
-    gridEl.addEventListener("dragend", () => {
-      this.draggedWidgetId = null;
-      this.removeGhost();
-      gridEl.querySelectorAll(".iris-hp-dragging").forEach((el) => el.removeClass("iris-hp-dragging"));
-    });
-
-    gridEl.addEventListener("click", (e) => {
-      if (!this.editMode) return;
-      // Ignore clicks on widget wrappers (they handle their own clicks)
-      if ((e.target as HTMLElement).closest(".iris-hp-widget-wrapper")) return;
-
-      const cell = this.getCellFromEvent(gridEl, e);
-      if (!cell) return;
-
-      if (this.pendingWidget) {
-        const col = Math.max(0, Math.min(cell.col, this.plugin.settings.columns - 1));
-        const row = Math.max(0, cell.row);
-        const result = this.pendingWidget;
-        if (this.placingCleanup) this.placingCleanup();
-        this.addWidgetAt(result, col, row);
-        return;
-      }
-
-      // Check if cell is occupied
-      const map = this.engine.buildOccupancyMap(this.plugin.settings.widgets);
-      const key = cell.row * 32 + cell.col;
-      if (map.has(key)) return;
-
-      this.openPickerAt(cell.col, cell.row);
+    attachGridListeners(gridEl, {
+      isEditMode: () => this.editMode,
+      getWidgets: () => this.hp.widgets,
+      getColumns: () => this.hp.columns,
+      getRows: () => this.hp.rows,
+      getCellFromEvent: (e) => this.getCellFromEvent(gridEl, e),
+      isCellOccupied: (col, row) => {
+        const map = this.engine.buildOccupancyMap(this.hp.widgets);
+        return map.has(row * 32 + col);
+      },
+      pushUndo: () => this.pushUndo(),
+      save: () => this.plugin.saveData(this.plugin.settings),
+      clampWidget: (w) => this.engine.clamp(w),
+      resolveCollisions: (w) => this.engine.resolveCollisions(this.hp.widgets, w),
+      updateLayout: () => this.updateLayout(),
+      getPendingWidget: () => this.pendingWidget,
+      cancelPlacing: () => { if (this.placingCleanup) this.placingCleanup(); },
+      addWidgetAt: (result, col, row) => this.addWidgetAt(result, col, row),
+      openPickerAt: (col, row) => this.openPickerAt(col, row),
+      setDraggedWidgetId: (id) => { this.draggedWidgetId = id; },
+      getDraggedWidgetId: () => this.draggedWidgetId,
+      setDragOffset: (col, row) => { this.dragOffsetCol = col; this.dragOffsetRow = row; },
+      getDragOffset: () => ({ col: this.dragOffsetCol, row: this.dragOffsetRow }),
     });
 
     gridEl.addEventListener("widget-resize-start", ((e: CustomEvent) => {
       if (!this.editMode) return;
-      const { widgetId, corner, event: mouseEvent } = e.detail;
-      this.startResize(gridEl, widgetId, corner, mouseEvent);
+      const { widgetId, corner } = e.detail;
+      startResize(gridEl, widgetId, corner, {
+        getWidgets: () => this.hp.widgets,
+        getColumns: () => this.hp.columns,
+        getRows: () => this.hp.rows,
+        getGridGap: () => this.gridGap,
+        getEffectiveRowCount: () => this.getEffectiveRowCount(),
+        pushUndo: () => this.pushUndo(),
+        save: () => this.plugin.saveData(this.plugin.settings),
+        updateLayout: () => this.updateLayout(),
+        resolveCollisions: (w) => this.engine.resolveCollisions(this.hp.widgets, w),
+      });
     }) as EventListener);
-  }
-
-  private startResize(gridEl: HTMLElement, widgetId: string, corner: string, startEvent: MouseEvent): void {
-    const widget = this.plugin.settings.widgets.find((w) => w.id === widgetId);
-    if (!widget) return;
-
-    const gridRect = gridEl.getBoundingClientRect();
-    const { cellW, cellH } = this.getCellSize(gridRect);
-    const stepX = cellW + this.gridGap;
-    const stepY = cellH + this.gridGap;
-
-    const origCol = widget.col;
-    const origRow = widget.row;
-    const origWidth = widget.width;
-    const origHeight = widget.height;
-
-    const anchorRight = origCol + origWidth;   // for tl, bl
-    const anchorBottom = origRow + origHeight;  // for tl, tr
-
-    const ghost = gridEl.createDiv({ cls: "iris-hp-resize-ghost" });
-    this.setGridPos(ghost, widget.col, widget.row, widget.width, widget.height);
-
-    const cellFromEvent = (e: MouseEvent) => ({
-      col: Math.floor((e.clientX - gridRect.left) / stepX),
-      row: Math.floor((e.clientY - gridRect.top) / stepY),
-    });
-
-    const computeRect = (e: MouseEvent) => {
-      const end = cellFromEvent(e);
-      let col = origCol, row = origRow, w = origWidth, h = origHeight;
-
-      switch (corner) {
-        case "br":
-          w = Math.max(1, end.col - origCol + 1);
-          h = Math.max(1, end.row - origRow + 1);
-          break;
-        case "bl":
-          col = Math.max(0, Math.min(end.col, anchorRight - 1));
-          w = anchorRight - col;
-          h = Math.max(1, end.row - origRow + 1);
-          break;
-        case "tr":
-          w = Math.max(1, end.col - origCol + 1);
-          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
-          h = anchorBottom - row;
-          break;
-        case "tl":
-          col = Math.max(0, Math.min(end.col, anchorRight - 1));
-          w = anchorRight - col;
-          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
-          h = anchorBottom - row;
-          break;
-        case "r":
-          w = Math.max(1, end.col - origCol + 1);
-          break;
-        case "l":
-          col = Math.max(0, Math.min(end.col, anchorRight - 1));
-          w = anchorRight - col;
-          break;
-        case "b":
-          h = Math.max(1, end.row - origRow + 1);
-          break;
-        case "t":
-          row = Math.max(0, Math.min(end.row, anchorBottom - 1));
-          h = anchorBottom - row;
-          break;
-      }
-
-      w = Math.min(w, this.plugin.settings.columns - col);
-      if (this.plugin.settings.rows > 0) {
-        h = Math.min(h, this.plugin.settings.rows - row);
-      }
-      return { col, row, w, h };
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      const r = computeRect(e);
-      this.setGridPos(ghost, r.col, r.row, r.w, r.h);
-    };
-
-    const onMouseUp = (e: MouseEvent) => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      ghost.remove();
-
-      const r = computeRect(e);
-      widget.col = r.col;
-      widget.row = r.row;
-      widget.width = r.w;
-      widget.height = r.h;
-
-      if (widget.width !== origWidth || widget.height !== origHeight || widget.col !== origCol || widget.row !== origRow) {
-        this.pushUndo();
-        const oldPositions = this.snapshotPositions(gridEl);
-        this.engine.resolveCollisions(this.plugin.settings.widgets, widget);
-        this.updateLayout();
-        this.animateReflow(gridEl, oldPositions);
-        this.plugin.saveData(this.plugin.settings);
-      }
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }
-
-  private updateGhost(gridEl: HTMLElement, e: DragEvent): void {
-    const cell = this.getCellFromEvent(gridEl, e);
-    if (!cell) return;
-
-    const widget = this.plugin.settings.widgets.find((w) => w.id === this.draggedWidgetId);
-    if (!widget) return;
-
-    if (!this.ghostEl) {
-      this.ghostEl = gridEl.createDiv({ cls: "iris-hp-drop-ghost" });
-    }
-
-    const col = Math.max(0, Math.min(cell.col - this.dragOffsetCol, this.plugin.settings.columns - widget.width));
-    const ghostMaxRow = this.plugin.settings.rows > 0 ? this.plugin.settings.rows - widget.height : Infinity;
-    const row = Math.max(0, Math.min(cell.row - this.dragOffsetRow, ghostMaxRow));
-    this.setGridPos(this.ghostEl, col, row, widget.width, widget.height);
-  }
-
-  private setGridPos(el: HTMLElement, col: number, row: number, w: number, h: number): void {
-    el.style.gridColumn = `${col + 1} / span ${w}`;
-    el.style.gridRow = `${row + 1} / span ${h}`;
-  }
-
-  private removeGhost(): void {
-    if (this.ghostEl) {
-      this.ghostEl.remove();
-      this.ghostEl = null;
-    }
-  }
-
-  private getCellSize(gridRect: DOMRect): { cellW: number; cellH: number } {
-    const cols = this.plugin.settings.columns;
-    const fixedRows = this.plugin.settings.rows;
-    const rowCount = fixedRows > 0
-      ? fixedRows
-      : Math.max(this.engine.getMaxRow(this.plugin.settings.widgets) + 1, 1);
-    return {
-      cellW: (gridRect.width - this.gridGap * (cols - 1)) / cols,
-      cellH: (gridRect.height - this.gridGap * (rowCount - 1)) / rowCount,
-    };
   }
 
   private getCellFromEvent(gridEl: HTMLElement, e: MouseEvent): { col: number; row: number } | null {
     const gridRect = gridEl.getBoundingClientRect();
-    const { cellW, cellH } = this.getCellSize(gridRect);
+    const { cellW, cellH } = getCellSize(
+      gridRect,
+      this.hp.columns,
+      this.getEffectiveRowCount(),
+      this.gridGap
+    );
 
     const relX = e.clientX - gridRect.left;
     const relY = e.clientY - gridRect.top;
 
     return this.engine.pixelToCell(relX, relY, cellW + this.gridGap, cellH + this.gridGap);
-  }
-
-  /** Snapshot bounding rects for all widget wrappers keyed by widget ID. */
-  private snapshotPositions(gridEl: HTMLElement): Map<string, DOMRect> {
-    const positions = new Map<string, DOMRect>();
-    gridEl.querySelectorAll<HTMLElement>(".iris-hp-widget-wrapper").forEach((el) => {
-      const id = el.dataset.widgetId;
-      if (id) positions.set(id, el.getBoundingClientRect());
-    });
-    return positions;
-  }
-
-  /** FLIP-animate widgets from old positions to their current grid positions. Call after updateLayout(). */
-  private animateReflow(gridEl: HTMLElement, oldPositions: Map<string, DOMRect>): void {
-    // Force layout so new positions are computed
-    gridEl.offsetHeight; // eslint-disable-line @typescript-eslint/no-unused-expressions
-
-    gridEl.querySelectorAll<HTMLElement>(".iris-hp-widget-wrapper").forEach((el) => {
-      const id = el.dataset.widgetId;
-      if (!id) return;
-      const oldRect = oldPositions.get(id);
-      if (!oldRect) return;
-
-      const newRect = el.getBoundingClientRect();
-      const dx = oldRect.left - newRect.left;
-      const dy = oldRect.top - newRect.top;
-
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-
-      el.style.transition = "none";
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-
-      requestAnimationFrame(() => {
-        el.style.transition = "transform 0.25s ease";
-        el.style.transform = "";
-      });
-    });
   }
 }

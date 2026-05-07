@@ -1,8 +1,15 @@
-import { App } from "obsidian";
+import { App, Menu } from "obsidian";
 import type { WidgetConfig } from "../types";
 import type IrisHomepagePlugin from "../main";
 
 export abstract class BaseWidget {
+  /**
+   * Optional hook for widgets to contribute items to the right-click menu
+   * shown over their wrapper. HomepageView calls this before appending its
+   * own generic actions (delete, etc.).
+   */
+  buildContextMenu?(menu: Menu): void;
+
   protected app: App;
   protected containerEl: HTMLElement;
   protected config: WidgetConfig;

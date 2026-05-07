@@ -35,67 +35,6 @@
   display: none;
 }
 
-/* ─── Toolbar ─── */
-.iris-hp-toolbar {
-  position: fixed;
-  bottom: 36px;
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  z-index: 100;
-}
-
-.iris-hp-toolbar-row {
-  display: flex;
-  gap: 6px;
-}
-
-.iris-hp-toolbar-row-grid {
-  opacity: 0.9;
-}
-
-.iris-hp-toolbar-btn-active {
-  outline: 2px solid var(--text-on-accent);
-  outline-offset: -4px;
-}
-
-.iris-hp-toolbar-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  cursor: pointer;
-  color: var(--text-faint);
-}
-
-.iris-hp-toolbar-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.iris-hp-toolbar-btn:hover {
-  color: var(--text-normal);
-}
-
-.iris-hp-edit-mode .iris-hp-toolbar-btn {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.iris-hp-edit-mode .iris-hp-toolbar-btn:hover {
-  filter: brightness(1.1);
-  color: var(--text-on-accent);
-}
-
 /* ─── Grid ─── */
 .iris-hp-grid {
   display: grid;
@@ -138,7 +77,7 @@
   flex-direction: column;
   height: 100%;
   background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
+  border: var(--iris-hp-border-width, 1px) solid var(--background-modifier-border);
   border-radius: 10px;
   overflow: hidden;
   transition: opacity 0.15s ease;
@@ -275,6 +214,15 @@
   transition: all 0.7s ease;
 }
 
+/* ─── Done-editing confirm button (edit-mode) ─── */
+/* Uses vanilla .mod-cta styling; we only handle positioning here. */
+.iris-hp-done-btn {
+  position: fixed;
+  bottom: 36px;
+  right: 36px;
+  z-index: 100;
+}
+
 /* ─── Widget body ─── */
 .iris-hp-widget-body {
   flex: 1;
@@ -343,7 +291,10 @@
 }
 
 /* ─── Borderless mode ─── */
-.iris-hp-borderless .iris-hp-widget {
+/* Edit mode always wins: dragging/resizing/picking widgets without visible
+   card edges is disorienting, so the chrome reappears regardless of the
+   global borderless setting while editing. */
+.iris-hp-borderless:not(.iris-hp-edit-mode) .iris-hp-widget {
   background: transparent;
   border-color: transparent;
 }
@@ -386,15 +337,16 @@
 }
 
 /* ─── Embedded note widget ─── */
+/* The container is a real .markdown-rendered surface so Obsidian's theme
+   styles apply natively (task-list checkbox alignment, headings, code
+   blocks, callouts, etc.). We deliberately don't override font-size or
+   line-height here — overriding either breaks the calibration the theme
+   depends on (e.g. checkbox dimensions don't scale with em, so a font
+   shrink shifts checkboxes off the text baseline). If a homepage needs
+   a denser look, scale the whole widget body instead of just the text. */
 .iris-hp-embedded-content {
   flex: 1;
   overflow-y: auto;
-  font-size: 0.9em;
-  line-height: 1.5;
-}
-
-.iris-hp-embedded-content p {
-  margin: 0.5em 0;
 }
 
 .iris-hp-embedded-open {
@@ -476,6 +428,31 @@
 .iris-hp-embedded-leaf .view-header-nav-buttons,
 .iris-hp-embedded-leaf .view-header-title-container,
 .iris-hp-embedded-leaf .view-actions {
+  display: none !important;
+}
+
+/* Hide all Bases controls — filter chips, view switcher, formula bar,
+   add-view button, settings, etc. The widget should present the data
+   read-only; editing belongs in the real Bases tab. */
+.iris-hp-base-embed .bases-controls,
+.iris-hp-base-embed .bases-embed-controls,
+.iris-hp-base-embed .bases-toolbar,
+.iris-hp-base-embed .bases-header,
+.iris-hp-base-embed .bases-view-header,
+.iris-hp-base-embed .bases-view-switcher,
+.iris-hp-base-embed .bases-tabs,
+.iris-hp-base-embed .bases-filter-bar,
+.iris-hp-base-embed .bases-filter,
+.iris-hp-base-embed .bases-formula-bar,
+.iris-hp-base-embed .bases-formula,
+.iris-hp-base-embed .bases-properties-toolbar,
+.iris-hp-base-embed .bases-add-view,
+.iris-hp-base-embed .bases-search,
+.iris-hp-base-embed .bases-settings,
+.iris-hp-base-embed [class*="bases-controls"],
+.iris-hp-base-embed [class*="bases-toolbar"],
+.iris-hp-base-embed [class*="bases-header"],
+.iris-hp-base-embed [class*="view-switcher"] {
   display: none !important;
 }
 
@@ -615,12 +592,23 @@
   justify-content: center;
 }
 
+/* Icon scales with the widget's smaller dimension (cqmin) so the glyph
+   actually fills the tile instead of floating tiny in the middle. The
+   clamp keeps it readable on extreme sizes: never smaller than ~20px
+   and never larger than ~80px (beyond that it stops looking like a
+   button and starts looking like wallpaper). */
 .iris-hp-new-note-icon svg,
 .iris-hp-create-task-icon svg,
 .iris-hp-command-icon svg {
-  width: 24px;
-  height: 24px;
-  color: var(--interactive-accent);
+  width: clamp(20px, 35cqmin, 56px);
+  height: clamp(20px, 35cqmin, 56px);
+  /* Inherit so the icon follows the tile's faint→normal hover transition,
+     same as the label, instead of fighting it with an accent override. */
+  color: inherit;
+  /* Lucide's default stroke (2px) reads as too heavy at the larger sizes
+     these icons can grow to. Thin it down so the glyph stays visually
+     light as the icon scales up. */
+  stroke-width: 1.5;
 }
 
 .iris-hp-new-note-label,
@@ -657,12 +645,14 @@
   }
 }
 
-@container (max-height: 80px) {
+/* When the label is hidden (very small widgets), let the icon grow into
+   the freed space so the tile reads as a single glyph button. */
+@container (max-height: 80px), (max-width: 80px) {
   .iris-hp-new-note-icon svg,
   .iris-hp-create-task-icon svg,
   .iris-hp-command-icon svg {
-    width: 18px;
-    height: 18px;
+    width: clamp(20px, 50cqmin, 56px);
+    height: clamp(20px, 50cqmin, 56px);
   }
 }
 
@@ -754,8 +744,9 @@
 }
 
 /* ─── Quick switcher widget ─── */
-.iris-hp-switcher-body {
-  display: flex;
+.iris-hp-switcher-body,
+.iris-hp-edit-mode .iris-hp-switcher-body {
+  display: flex !important;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
@@ -862,8 +853,9 @@
 }
 
 /* ─── Widget error boundary ─── */
-.iris-hp-widget-error {
-  display: flex;
+.iris-hp-widget-error,
+.iris-hp-edit-mode .iris-hp-widget-error {
+  display: flex !important;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -877,10 +869,69 @@
   opacity: 0.6;
 }
 
-/* ─── Toolbar disabled state ─── */
-.iris-hp-toolbar-btn-disabled {
-  opacity: 0.3;
-  pointer-events: none;
+/* ─── Message widget ─── */
+.iris-hp-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  line-height: 1.4;
+  color: var(--text-normal);
+  font-style: italic;
+  white-space: pre-wrap;
+  overflow: hidden;
+  container-type: size;
+}
+
+.iris-hp-message-text {
+  width: 100%;
+  font-size: clamp(0.9em, 4cqmin, 1.3em);
+  overflow-wrap: break-word;
+}
+
+.iris-hp-message-empty {
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* ─── Analog clock widget ─── */
+.iris-hp-clock-body {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 8px !important;
+}
+
+.iris-hp-clock {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+}
+
+.iris-hp-clock-dot {
+  fill: var(--text-muted);
+  opacity: 0.55;
+}
+
+.iris-hp-clock-hand-hour {
+  stroke: var(--text-normal);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.iris-hp-clock-hand-minute {
+  stroke: var(--text-normal);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.iris-hp-clock-center {
+  fill: var(--text-normal);
 }
 
 /* ─── Settings indent ─── */

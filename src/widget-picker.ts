@@ -1,5 +1,8 @@
 import { App, Modal, setIcon } from "obsidian";
 import { BUILTIN_WIDGETS, HIDDEN_VIEW_TYPES, CORE_VIEW_TYPES, VIEW_TYPE_ICON_MAP, humanizeViewType } from "./constants";
+import { isInternalPluginEnabled } from "./utils";
+import type IrisHomepagePlugin from "./main";
+import type { HomepageView } from "./homepage-view";
 
 export interface PickerResult {
   type: string;
@@ -11,16 +14,26 @@ interface PickerEntry {
   type: string;
   label: string;
   icon: string;
-  group: "homepage" | "core" | "plugin";
+  group: "homepage" | "iris" | "core" | "plugin";
   width: number;
   height: number;
+  /** Optional human-readable name of a core plugin this widget depends on. */
+  corePluginLabel?: string;
 }
 
 export class WidgetPickerModal extends Modal {
+  private plugin: IrisHomepagePlugin;
+  private homepageView: HomepageView;
   private resolve: ((result: PickerResult | null) => void) | null = null;
   private entries: PickerEntry[] = [];
   private filteredEntries: PickerEntry[] = [];
   private gridEl: HTMLElement | null = null;
+
+  constructor(app: App, plugin: IrisHomepagePlugin, homepageView: HomepageView) {
+    super(app);
+    this.plugin = plugin;
+    this.homepageView = homepageView;
+  }
 
   open(): Promise<PickerResult | null> {
     this.entries = this.buildEntries();
@@ -69,6 +82,7 @@ export class WidgetPickerModal extends Modal {
 
     const groups: { label: string; entries: PickerEntry[] }[] = [
       { label: "Home", entries: this.filteredEntries.filter((e) => e.group === "homepage") },
+      { label: "Iris", entries: this.filteredEntries.filter((e) => e.group === "iris") },
       { label: "Core", entries: this.filteredEntries.filter((e) => e.group === "core") },
       { label: "Plugins", entries: this.filteredEntries.filter((e) => e.group === "plugin") },
     ];
@@ -84,6 +98,11 @@ export class WidgetPickerModal extends Modal {
         const iconEl = card.createDiv({ cls: "iris-hp-picker-card-icon" });
         setIcon(iconEl, entry.icon);
         card.createDiv({ cls: "iris-hp-picker-card-label", text: entry.label });
+        if (entry.corePluginLabel) {
+          // Surface the dependency only via tooltip — visible subtitles
+          // disrupted the grid's vertical rhythm.
+          card.setAttr("aria-label", `${entry.label} (via ${entry.corePluginLabel})`);
+        }
 
         card.addEventListener("click", () => {
           if (this.resolve) {
@@ -104,6 +123,7 @@ export class WidgetPickerModal extends Modal {
     const entries: PickerEntry[] = [];
 
     for (const [type, meta] of Object.entries(BUILTIN_WIDGETS)) {
+      if (meta.corePluginId && !isInternalPluginEnabled(this.app, meta.corePluginId)) continue;
       entries.push({
         type,
         label: meta.label,
@@ -111,6 +131,19 @@ export class WidgetPickerModal extends Modal {
         group: "homepage",
         width: meta.width,
         height: meta.height,
+        corePluginLabel: meta.corePluginLabel,
+      });
+    }
+
+    for (const def of this.plugin.widgetRegistry.list()) {
+      const cells = this.homepageView.pxToCells(def.defaultSizePx);
+      entries.push({
+        type: def.type,
+        label: def.label,
+        icon: def.icon,
+        group: "iris",
+        width: cells.width,
+        height: cells.height,
       });
     }
 
@@ -122,8 +155,8 @@ export class WidgetPickerModal extends Modal {
 
       for (const viewType of viewByType.keys()) {
         if (HIDDEN_VIEW_TYPES.has(viewType)) continue;
-        if (CORE_VIEW_TYPES.has(viewType)) continue;
         if (Object.prototype.hasOwnProperty.call(BUILTIN_WIDGETS, viewType)) continue;
+        if (this.plugin.widgetRegistry.get(viewType)) continue;
 
         entries.push({
           type: viewType,
