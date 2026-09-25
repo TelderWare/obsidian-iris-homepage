@@ -1,6 +1,6 @@
 import { App, Modal, setIcon } from "obsidian";
-import { BUILTIN_WIDGETS, HIDDEN_VIEW_TYPES, CORE_VIEW_TYPES, VIEW_TYPE_ICON_MAP, humanizeViewType } from "./constants";
-import { isInternalPluginEnabled } from "./utils";
+import { BUILTIN_WIDGETS, HIDDEN_VIEW_TYPES, CORE_VIEW_TYPES, humanizeViewType } from "./constants";
+import { isInternalPluginEnabled, resolveViewIcon } from "./utils";
 import type IrisHomepagePlugin from "./main";
 import type { HomepageView } from "./homepage-view";
 
@@ -161,7 +161,7 @@ export class WidgetPickerModal extends Modal {
         entries.push({
           type: viewType,
           label: humanizeViewType(viewType),
-          icon: VIEW_TYPE_ICON_MAP[viewType] || "box",
+          icon: resolveViewIcon(this.app, viewType),
           group: CORE_VIEW_TYPES.has(viewType) ? "core" : "plugin",
           width: 2,
           height: 3,
