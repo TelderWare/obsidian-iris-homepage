@@ -38,6 +38,7 @@ export interface DragHost {
 /** Attach drag/drop/click/resize-start listeners to the grid element. */
 export function attachGridListeners(gridEl: HTMLElement, host: DragHost): void {
   let ghostEl: HTMLElement | null = null;
+  let touchDrag: { pointerId: number; startX: number; startY: number; wrapper: HTMLElement; active: boolean } | null = null;
 
   const removeGhost = () => {
     if (ghostEl) {
@@ -46,7 +47,7 @@ export function attachGridListeners(gridEl: HTMLElement, host: DragHost): void {
     }
   };
 
-  const updateGhost = (e: DragEvent) => {
+  const updateGhost = (e: MouseEvent) => {
     const cell = host.getCellFromEvent(e);
     if (!cell) return;
 
@@ -68,7 +69,9 @@ export function attachGridListeners(gridEl: HTMLElement, host: DragHost): void {
   };
 
   gridEl.addEventListener("dragstart", (e) => {
-    if (!host.isEditMode()) {
+    // A touch drag (below) is already moving the widget; don't let the
+    // browser's long-press native drag take over mid-gesture.
+    if (!host.isEditMode() || touchDrag) {
       e.preventDefault();
       return;
     }
@@ -102,15 +105,9 @@ export function attachGridListeners(gridEl: HTMLElement, host: DragHost): void {
     removeGhost();
   });
 
-  gridEl.addEventListener("drop", (e) => {
-    e.preventDefault();
-    removeGhost();
+  /** Move the dragged widget so its grabbed cell lands on `cell`. */
+  const commitMove = (cell: { col: number; row: number }) => {
     const draggedId = host.getDraggedWidgetId();
-    if (!draggedId) return;
-
-    const cell = host.getCellFromEvent(e);
-    if (!cell) return;
-
     const widget = host.getWidgets().find((w) => w.id === draggedId);
     if (!widget) return;
 
@@ -130,12 +127,99 @@ export function attachGridListeners(gridEl: HTMLElement, host: DragHost): void {
     host.updateLayout();
     animateReflow(gridEl, oldPositions);
     host.save();
+  };
+
+  gridEl.addEventListener("drop", (e) => {
+    e.preventDefault();
+    removeGhost();
+    if (!host.getDraggedWidgetId()) return;
+
+    const cell = host.getCellFromEvent(e);
+    if (!cell) return;
+    commitMove(cell);
   });
 
   gridEl.addEventListener("dragend", () => {
     host.setDraggedWidgetId(null);
     removeGhost();
     gridEl.querySelectorAll(".iris-hp-dragging").forEach((el) => el.removeClass("iris-hp-dragging"));
+  });
+
+  // ─── Touch dragging ───
+  // HTML5 drag-and-drop needs a long press on mobile, and a plain horizontal
+  // swipe is claimed by Obsidian's sidebar gesture. Touch pointers instead
+  // drive the move directly; HomepageView stops the touch events from
+  // reaching the sidebar handler, and `touch-action: none` on edit-mode
+  // wrappers keeps the browser from scrolling mid-drag.
+  const findTrash = (x: number, y: number): HTMLElement | null =>
+    (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>(".iris-hp-trash-zone") ?? null;
+
+  const endTouchDrag = () => {
+    document.removeEventListener("pointermove", onTouchMove);
+    document.removeEventListener("pointerup", onTouchUp);
+    document.removeEventListener("pointercancel", onTouchCancel);
+    removeGhost();
+    document.querySelectorAll(".iris-hp-trash-hover").forEach((el) => el.removeClass("iris-hp-trash-hover"));
+    touchDrag?.wrapper.removeClass("iris-hp-dragging");
+    touchDrag = null;
+  };
+
+  const onTouchMove = (e: PointerEvent) => {
+    if (!touchDrag || e.pointerId !== touchDrag.pointerId) return;
+    if (!touchDrag.active) {
+      // Small threshold so taps on the configure buttons still register as clicks.
+      if (Math.hypot(e.clientX - touchDrag.startX, e.clientY - touchDrag.startY) < 8) return;
+      touchDrag.active = true;
+      touchDrag.wrapper.addClass("iris-hp-dragging");
+    }
+    e.preventDefault();
+    const trash = findTrash(e.clientX, e.clientY);
+    document.querySelectorAll(".iris-hp-trash-zone").forEach((el) => el.toggleClass("iris-hp-trash-hover", el === trash));
+    if (trash) removeGhost();
+    else updateGhost(e);
+  };
+
+  const onTouchUp = (e: PointerEvent) => {
+    if (!touchDrag || e.pointerId !== touchDrag.pointerId) return;
+    const wasActive = touchDrag.active;
+    endTouchDrag();
+    if (!wasActive) {
+      host.setDraggedWidgetId(null);
+      return;
+    }
+    const trash = findTrash(e.clientX, e.clientY);
+    if (trash) {
+      trash.dispatchEvent(new CustomEvent("iris-hp-touch-drop"));
+    } else {
+      const cell = host.getCellFromEvent(e);
+      if (cell) commitMove(cell);
+    }
+    host.setDraggedWidgetId(null);
+  };
+
+  const onTouchCancel = (e: PointerEvent) => {
+    if (!touchDrag || e.pointerId !== touchDrag.pointerId) return;
+    endTouchDrag();
+    host.setDraggedWidgetId(null);
+  };
+
+  gridEl.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" || !host.isEditMode() || touchDrag) return;
+    const target = e.target as HTMLElement;
+    if (target.closest(".iris-hp-resize-handle, .iris-hp-widget-configure")) return;
+    const wrapper = target.closest<HTMLElement>(".iris-hp-widget-wrapper");
+    const id = wrapper?.dataset.widgetId;
+    if (!wrapper || !id) return;
+    const widget = host.getWidgets().find((w) => w.id === id);
+    if (!widget) return;
+
+    const cell = host.getCellFromEvent(e);
+    host.setDraggedWidgetId(id);
+    host.setDragOffset(cell ? cell.col - widget.col : 0, cell ? cell.row - widget.row : 0);
+    touchDrag = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, wrapper, active: false };
+    document.addEventListener("pointermove", onTouchMove);
+    document.addEventListener("pointerup", onTouchUp);
+    document.addEventListener("pointercancel", onTouchCancel);
   });
 
   gridEl.addEventListener("click", (e) => {

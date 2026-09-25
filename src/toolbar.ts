@@ -43,11 +43,18 @@ export function renderTrashZone(root: HTMLElement, cb: TrashZoneCallbacks): void
     trash.removeClass("iris-hp-trash-hover");
   });
 
-  trash.addEventListener("drop", (e) => {
-    e.preventDefault();
+  const onDrop = () => {
     trash.removeClass("iris-hp-trash-hover");
     const widgetId = cb.getDraggedWidgetId();
     if (!widgetId) return;
     cb.onTrashDrop(widgetId);
+  };
+
+  trash.addEventListener("drop", (e) => {
+    e.preventDefault();
+    onDrop();
   });
+
+  // Touch drags (see drag-controller) don't fire HTML5 drop events.
+  trash.addEventListener("iris-hp-touch-drop", onDrop);
 }

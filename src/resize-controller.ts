@@ -19,8 +19,8 @@ export interface ResizeHost {
 type Corner = "br" | "bl" | "tr" | "tl" | "r" | "l" | "b" | "t";
 
 /**
- * Start a resize gesture. Installs mousemove/mouseup listeners on `document`
- * that track the mouse and move a ghost element; on mouseup, commits the new
+ * Start a resize gesture. Installs pointermove/pointerup listeners on `document`
+ * that track the pointer and move a ghost element; on pointerup, commits the new
  * rect to the widget, resolves collisions, and animates the reflow.
  */
 export function startResize(
@@ -51,12 +51,12 @@ export function startResize(
   const ghost = gridEl.createDiv({ cls: "iris-hp-resize-ghost" });
   setGridPos(ghost, widget.col, widget.row, widget.width, widget.height);
 
-  const cellFromEvent = (e: MouseEvent) => ({
+  const cellFromEvent = (e: PointerEvent) => ({
     col: Math.floor((e.clientX - gridRect.left) / stepX),
     row: Math.floor((e.clientY - gridRect.top) / stepY),
   });
 
-  const computeRect = (e: MouseEvent) => {
+  const computeRect = (e: PointerEvent) => {
     const end = cellFromEvent(e);
     let col = origCol, row = origRow, w = origWidth, h = origHeight;
 
@@ -102,14 +102,14 @@ export function startResize(
     return { col, row, w, h };
   };
 
-  const onMouseMove = (e: MouseEvent) => {
+  const onPointerMove = (e: PointerEvent) => {
     const r = computeRect(e);
     setGridPos(ghost, r.col, r.row, r.w, r.h);
   };
 
-  const onMouseUp = (e: MouseEvent) => {
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
+  const onPointerUp = (e: PointerEvent) => {
+    document.removeEventListener("pointermove", onPointerMove);
+    document.removeEventListener("pointerup", onPointerUp);
     ghost.remove();
 
     const r = computeRect(e);
@@ -134,6 +134,6 @@ export function startResize(
     }
   };
 
-  document.addEventListener("mousemove", onMouseMove);
-  document.addEventListener("mouseup", onMouseUp);
+  document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("pointerup", onPointerUp);
 }

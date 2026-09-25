@@ -32,7 +32,7 @@ export abstract class BaseWidget {
 
     for (const edge of ["tl", "tr", "bl", "br", "t", "r", "b", "l"] as const) {
       const handle = this.containerEl.createDiv({ cls: `iris-hp-resize-handle iris-hp-resize-${edge}` });
-      handle.addEventListener("mousedown", (e) => {
+      handle.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         e.stopPropagation();
         this.containerEl.dispatchEvent(

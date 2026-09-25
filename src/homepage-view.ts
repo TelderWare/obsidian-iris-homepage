@@ -113,6 +113,21 @@ export class HomepageView extends ItemView {
       window.setTimeout(() => { body.style.pointerEvents = ""; }, 0);
     });
 
+    // On mobile, Obsidian claims horizontal swipes to open the sidebars, which
+    // swallows widget drags. While editing, keep touches that start on a
+    // widget away from that handler. Window capture runs before any
+    // document-level listener, and stopping propagation doesn't affect the
+    // pointer events the drag/resize controllers use.
+    const guardTouch = (e: TouchEvent) => {
+      if (!this.editMode) return;
+      const target = e.target as HTMLElement | null;
+      if (target && this.contentEl.contains(target) && target.closest(".iris-hp-widget-wrapper")) {
+        e.stopPropagation();
+      }
+    };
+    this.registerDomEvent(window, "touchstart", guardTouch, { capture: true });
+    this.registerDomEvent(window, "touchmove", guardTouch, { capture: true });
+
     // Right-click: widget-specific menu on widgets, global action menu elsewhere.
     this.registerDomEvent(this.contentEl, "contextmenu", (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
