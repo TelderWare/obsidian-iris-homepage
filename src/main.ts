@@ -368,6 +368,16 @@ export default class IrisHomepagePlugin extends Plugin {
       delete (data as { taskFolder?: unknown }).taskFolder;
     }
 
+    // Migration v11: the "web-search" builtin was removed. Drop existing
+    // instances rather than leaving "unavailable" placeholders behind.
+    if (version < 11 && homepagesIsRecord) {
+      const homepages = data.homepages as Record<string, HomepageConfig>;
+      for (const hp of Object.values(homepages)) {
+        if (!Array.isArray(hp.widgets)) continue;
+        hp.widgets = hp.widgets.filter((w) => w.type !== "web-search");
+      }
+    }
+
     this.settings = Object.assign(
       {},
       DEFAULT_SETTINGS,
@@ -376,7 +386,7 @@ export default class IrisHomepagePlugin extends Plugin {
         ? { homepages: data.homepages }
         : { homepages: cloneDefaultHomepages() },
     );
-    this.settings.gridVersion = 10;
+    this.settings.gridVersion = 11;
 
     if (version < 10) {
       await this.saveData(this.settings);

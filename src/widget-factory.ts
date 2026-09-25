@@ -11,7 +11,6 @@ import { QuickSwitcherWidget } from "./widgets/quick-switcher";
 import { OpenUrlWidget } from "./widgets/open-url";
 import { ViewEmbedWidget } from "./widgets/view-embed";
 import { BaseFileWidget } from "./widgets/base-file";
-import { WebSearchWidget } from "./widgets/web-search";
 import { MessageWidget } from "./widgets/message";
 import { AnalogClockWidget } from "./widgets/analog-clock";
 import { RegisteredWidget } from "./widgets/registered-widget";
@@ -47,8 +46,6 @@ export function createWidget(
         return new OpenUrlWidget(app, wrapper, config, plugin);
       case "base":
         return new BaseFileWidget(app, wrapper, config, plugin);
-      case "web-search":
-        return new WebSearchWidget(app, wrapper, config, plugin);
       case "message":
         return new MessageWidget(app, wrapper, config, plugin);
       case "analog-clock":

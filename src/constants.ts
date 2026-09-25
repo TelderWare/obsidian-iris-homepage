@@ -60,7 +60,6 @@ export const BUILTIN_WIDGETS: Record<BuiltinWidgetType, BuiltinWidgetMeta> = {
   "quick-switcher": { label: "Quick Switcher", icon: "search", width: 8, height: 1 },
   "open-url": { label: "Open URL", icon: "link", width: 2, height: 2 },
   "base": { label: "Base", icon: "database", width: 4, height: 6, corePluginId: "bases", corePluginLabel: "Bases" },
-  "web-search": { label: "Web Search", icon: "globe", width: 6, height: 1, corePluginId: "webviewer", corePluginLabel: "Web Viewer" },
   "message": { label: "Message", icon: "message-square", width: 4, height: 2 },
   "analog-clock": { label: "Analog Clock", icon: "clock", width: 3, height: 3 },
 };
